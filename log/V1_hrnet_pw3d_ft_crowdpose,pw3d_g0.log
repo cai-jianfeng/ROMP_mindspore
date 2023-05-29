@@ -1,0 +1,19 @@
+yaml_timestamp  /home/yutao_intern/workspace/ROMP-master/active_configs/active_context_2023-04-17_18_12_02.yaml
+/home/yutao_intern/anaconda3/envs/cv/lib/python3.8/site-packages/torchvision/io/image.py:13: UserWarning: Failed to load image Python extension: /home/yutao_intern/anaconda3/envs/cv/lib/python3.8/site-packages/torchvision/image.so: undefined symbol: _ZN5torch3jit17parseSchemaOrNameERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+  warn(f"Failed to load image Python extension: {e}")
+Traceback (most recent call last):
+  File "/home/yutao_intern/anaconda3/envs/cv/lib/python3.8/runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/home/yutao_intern/anaconda3/envs/cv/lib/python3.8/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/home/yutao_intern/workspace/ROMP-master/romp/train.py", line 1, in <module>
+    from .base import *
+  File "/home/yutao_intern/workspace/ROMP-master/romp/base.py", line 25, in <module>
+    from visualization.visualization import Visualizer
+  File "/home/yutao_intern/workspace/ROMP-master/romp/lib/models/../visualization/visualization.py", line 14, in <module>
+    import pytorch3d.renderer as pyr
+  File "/home/yutao_intern/anaconda3/envs/cv/lib/python3.8/site-packages/pytorch3d/renderer/__init__.py", line 7, in <module>
+    from .blending import (
+  File "/home/yutao_intern/anaconda3/envs/cv/lib/python3.8/site-packages/pytorch3d/renderer/blending.py", line 10, in <module>
+    from pytorch3d import _C
+ImportError: /home/yutao_intern/anaconda3/envs/cv/lib/python3.8/site-packages/pytorch3d/_C.cpython-38-x86_64-linux-gnu.so: undefined symbol: _ZNK3c1010TensorImpl18compute_contiguousEv
