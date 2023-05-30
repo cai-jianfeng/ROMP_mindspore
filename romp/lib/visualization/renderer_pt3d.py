@@ -5,6 +5,7 @@ import json
 import mindspore # import torch
 from mindspore import ops, nn
 # from torch import nn
+import torch
 import pickle
 # Data structures and functions for rendering
 from pytorch3d.structures import Meshes, join_meshes_as_scene
@@ -50,11 +51,11 @@ class Renderer(nn.Cell):
         super(Renderer, self).__init__()
         self.perps = perps
         self.with_depth = with_depth
-        if use_gpu:
-            self.device = mindspore.set_context('cuda:{}'.format(str(args().gpu).split(',')[0]))
-        else:
-            self.device = mindspore.set_context('cpu')
-
+        # if use_gpu:
+        #     self.device = torch.device('cuda:{}'.format(str(args().gpu).split(',')[0]))
+        # else:
+        #     self.device = torch.device('cpu')
+        self.device = torch.device('cpu')
         if R is None:
             R = mindspore.Tensor([[[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]])
         if T is None:
@@ -69,7 +70,7 @@ class Renderer(nn.Cell):
                 self.cameras = FoVOrthographicCameras(R=R, T=T, znear=0., zfar=100.0, max_y=1.0, min_y=-1.0, max_x=1.0, min_x=-1.0, device=self.device)
             else:
                 self.cameras = FoVOrthographicCameras(R=R, T=T, znear=0., zfar=100.0, max_y=2.0, min_y=-2.0, max_x=2.0, min_x=-2.0, device=self.device)
-            self.lights = DirectionalLights(ambient_color=((0.6, 0.6, 0.6),),direction=mindspore.Tensor([[0., -1., 0.]]), device=self.device)
+            self.lights = DirectionalLights(ambient_color=((0.6, 0.6, 0.6),), direction=torch.Tensor([[0., -1., 0.]]), device=self.device)
 
         # Define the settings for rasterization and shading. Here we set the output image to be of size
         # 512x512. As we are rendering images for visualization purposes only we will set faces_per_pixel=1
@@ -107,7 +108,7 @@ class Renderer(nn.Cell):
 
     def __call__(self, verts, faces, colors=mindspore.Tensor(mesh_color_table['neutral']), merge_meshes=True, cam_params=None):
         assert len(verts.shape) == 3, print('The input verts of visualizer is bounded to be 3-dims (Nx6890 x3) tensor')
-        verts, faces = verts.to(self.device), faces.to(self.device)
+        verts, faces = verts, faces
         verts_rgb = ops.ones_like(verts)
         verts_rgb = set_mesh_color(verts_rgb, colors)
         textures = TexturesVertex(verts_features=verts_rgb)

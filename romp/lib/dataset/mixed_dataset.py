@@ -99,7 +99,13 @@ class MixedDataset:
             index_sample = int(sample_prob * self.lengths[dataset_id])
         data = self.datasets[dataset_id][index_sample]
         data['subject_ids'][data['subject_ids'] != -1] += self.ID_num_list[dataset_id]
-        return data
+        # print(type(data))
+        # print(data.keys())
+        tuple_data = tuple([value.numpy() if isinstance(value, ms.Tensor) else np.array(value) for value in data.values()])
+        # for key, value in data.items():
+        #     print(key, type(value))
+        # print(len(tuple_data))
+        return tuple_data  # 到这里都可以正常输出
 
     def __len__(self):
         return self.total_length

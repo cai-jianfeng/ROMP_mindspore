@@ -30,7 +30,7 @@ print("yaml_timestamp ", yaml_timestamp)
 def parse_args(input_args=None):
     parser = argparse.ArgumentParser(description='ROMP: Monocular, One-stage, Regression of Multiple 3D People')
     parser.add_argument('--tab', type=str, default='ROMP_v1', help='additional tabs')
-    parser.add_argument('--configs_yml', type=str, default=os.path.join(project_dir, 'configs/v1.yml'), help='settings')
+    parser.add_argument('--configs_yml', type=str, default=os.path.join(project_dir, 'configs/v1_hrnet_flag3d_ft.yml'), help='settings')
     parser.add_argument('--inputs', type=str, help='path to inputs')
     parser.add_argument('--output_dir', type=str, help='path to save outputs')
     parser.add_argument('--interactive_vis', action='store_true',

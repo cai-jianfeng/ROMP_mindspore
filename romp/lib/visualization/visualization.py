@@ -13,7 +13,7 @@ import copy
 
 import os, sys
 import pytorch3d.renderer as pyr
-
+import torch
 import constants
 import config
 from config import args
@@ -34,7 +34,7 @@ class Visualizer(object):
     def __init__(self, resolution=(512,512), result_img_dir = None, with_renderer=False):
         self.resolution = resolution
         self.FOV = np.radians(args().FOV)
-        self.smpl_face = mindspore.load_checkpoint(args().smpl_model_path)['f']
+        self.smpl_face = torch.load(args().smpl_model_path)['f']
         if with_renderer:
             self.perps_proj = args().perspective_proj
             T= None if self.perps_proj else mindspore.Tensor([[0.,0.,100]])                
@@ -342,21 +342,24 @@ class Plotter3dPoses:
 
     def __init__(self, canvas_size=(512,512), origin=(0.5, 0.5), scale=200):
         self.canvas_size = canvas_size
-        self.origin = mindspore.Tensor([origin[1] * canvas_size[1], origin[0] * canvas_size[0]], dtype=mindspore.float32)  # x, y
-        self.scale = mindspore.float32(scale)
+        self.origin = np.array([origin[1] * canvas_size[1], origin[0] * canvas_size[0]], dtype=np.float32)  # x, y
+        self.scale = np.float32(scale)
         self.theta, self.phi = 0, np.pi/2 #np.pi/4, -np.pi/6
         axis_length = 200
         axes = [
-            mindspore.Tensor([[-axis_length/2, -axis_length/2, 0], [axis_length/2, -axis_length/2, 0]], dtype=mindspore.float32),
-            mindspore.Tensor([[-axis_length/2, -axis_length/2, 0], [-axis_length/2, axis_length/2, 0]], dtype=mindspore.float32),
-            mindspore.Tensor([[-axis_length/2, -axis_length/2, 0], [-axis_length/2, -axis_length/2, axis_length]], dtype=mindspore.float32)]
+            np.array([[-axis_length / 2, -axis_length / 2, 0], [axis_length / 2, -axis_length / 2, 0]],
+                     dtype=np.float32),
+            np.array([[-axis_length / 2, -axis_length / 2, 0], [-axis_length / 2, axis_length / 2, 0]],
+                     dtype=np.float32),
+            np.array([[-axis_length / 2, -axis_length / 2, 0], [-axis_length / 2, -axis_length / 2, axis_length]],
+                     dtype=np.float32)]
         step = 20
         for step_id in range(axis_length // step + 1):  # add grid
-            axes.append(mindspore.Tensor([[-axis_length / 2, -axis_length / 2 + step_id * step, 0],
-                                  [axis_length / 2, -axis_length / 2 + step_id * step, 0]], dtype=mindspore.float32))
-            axes.append(mindspore.Tensor([[-axis_length / 2 + step_id * step, -axis_length / 2, 0],
-                                  [-axis_length / 2 + step_id * step, axis_length / 2, 0]], dtype=mindspore.float32))
-        self.axes = mindspore.Tensor(axes)
+            axes.append(np.array([[-axis_length / 2, -axis_length / 2 + step_id * step, 0],
+                                  [axis_length / 2, -axis_length / 2 + step_id * step, 0]], dtype=np.float32))
+            axes.append(np.array([[-axis_length / 2 + step_id * step, -axis_length / 2, 0],
+                                  [-axis_length / 2 + step_id * step, axis_length / 2, 0]], dtype=np.float32))
+        self.axes = np.array(axes)
 
     def plot(self, pose_3ds, bones, colors=[(255, 255, 255)], img=None):
         img = np.ones((self.canvas_size[0],self.canvas_size[1],3), dtype=np.uint8) * 255 if img is None else img

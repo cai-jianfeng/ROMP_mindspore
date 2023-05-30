@@ -6,12 +6,12 @@ from imgaug.augmentables import Keypoint, KeypointsOnImage
 import random
 import cv2
 import numpy as np
+
 ia.seed(1)
 
 import random
 import math
 import numpy as np
-import mindspore # import torch
 from PIL import Image
 from PIL import ImageEnhance
 import functools
@@ -25,58 +25,64 @@ import sys, os
 import constants
 import random
 
+
 def convert_bbox2scale(ltrb, input_size):
     h, w = input_size
     l, t, r, b = ltrb
-    scale = max(r-l, b-t) / min(h, w)
-    return scale 
+    scale = max(r - l, b - t) / min(h, w)
+    return scale
+
 
 def calc_aabb(ptSets):
-    ptLeftTop     = mindspore.Tensor([np.min(ptSets[:,0]),np.min(ptSets[:,1])])
-    ptRightBottom = mindspore.Tensor([np.max(ptSets[:,0]),np.max(ptSets[:,1])])
+    ptLeftTop = np.array([np.min(ptSets[:, 0]), np.min(ptSets[:, 1])])
+    ptRightBottom = np.array([np.max(ptSets[:, 0]), np.max(ptSets[:, 1])])
 
-    return mindspore.Tensor([ptLeftTop, ptRightBottom])
+    return np.array([ptLeftTop, ptRightBottom])
 
-def flip_kps(kps, width=None, is_pose=True,flipped_parts=constants.All54_flip):
+
+def flip_kps(kps, width=None, is_pose=True, flipped_parts=constants.All54_flip):
     if is_pose:
         kps = kps[flipped_parts]
-    invalid_mask = kps[:,-1]==-2
+    invalid_mask = kps[:, -1] == -2
     if width is not None:
-        kps[:,0] = width - kps[:,0]
+        kps[:, 0] = width - kps[:, 0]
     else:
-        kps[:,0] = - kps[:,0]
+        kps[:, 0] = - kps[:, 0]
     kps[invalid_mask] = -2
     return kps
+
 
 def rot_imgplane(kp3d, angle):
     if angle == 0:
         return kp3d
-    invalid_mask = kp3d[:,-1]==-2
+    invalid_mask = kp3d[:, -1] == -2
     # in-plane rotation
     rot_mat = np.eye(3)
     rot_rad = angle * np.pi / 180
-    sn,cs = np.sin(rot_rad), np.cos(rot_rad)
-    rot_mat[0,:2] = [cs, -sn]
-    rot_mat[1,:2] = [sn, cs]
-    kp3d = np.einsum('ij,kj->ki', rot_mat, kp3d) 
+    sn, cs = np.sin(rot_rad), np.cos(rot_rad)
+    rot_mat[0, :2] = [cs, -sn]
+    rot_mat[1, :2] = [sn, cs]
+    kp3d = np.einsum('ij,kj->ki', rot_mat, kp3d)
     kp3d[invalid_mask] = -2
     return kp3d
+
 
 def rot_aa(aa, rot):
     """Rotate axis angle parameters."""
     # pose parameters
-    R = mindspore.Tensor([[np.cos(np.deg2rad(rot)), -np.sin(np.deg2rad(rot)), 0],
+    R = np.array([[np.cos(np.deg2rad(rot)), -np.sin(np.deg2rad(rot)), 0],
                   [np.sin(np.deg2rad(rot)), np.cos(np.deg2rad(rot)), 0],
                   [0, 0, 1]])
     # find the rotation of the body in camera frame
     per_rdg, _ = cv2.Rodrigues(aa)
     # apply the global rotation to the global orientation
-    resrot, _ = cv2.Rodrigues(np.dot(R,per_rdg))
+    resrot, _ = cv2.Rodrigues(np.dot(R, per_rdg))
     aa = (resrot.T)[0]
     return aa
 
+
 def flip_pose(pose):
-    #Flip pose.The flipping is based on SMPL parameters.
+    # Flip pose.The flipping is based on SMPL parameters.
     flipped_parts = constants.SMPL_POSE_FLIP_PERM
     pose = pose[flipped_parts]
     # we also negate the second and the third dimension of the axis-angle
@@ -84,42 +90,47 @@ def flip_pose(pose):
     pose[2::3] = -pose[2::3]
     return pose
 
+
 def pose_processing(pose, rot, flip, valid_grot=False, valid_pose=False):
     """Process SMPL theta parameters  and apply all augmentation transforms."""
-    
+
     if valid_grot:
         # rotation or the pose parameters
         pose[:3] = rot_aa(pose[:3], rot)
     # flip the pose parameters
     if flip and valid_pose:
         pose = flip_pose(pose)
-    
+
     return pose
 
 
-def image_crop_pad(image, kp2ds=None, crop_trbl=(0,0,0,0), bbox=None, pad_ratio=1., pad_trbl=None, draw_kp_on_image=False):
+def image_crop_pad(image, kp2ds=None, crop_trbl=(0, 0, 0, 0), bbox=None, pad_ratio=1., pad_trbl=None,
+                   draw_kp_on_image=False):
     '''
     Perform augmentation of image (and kp2ds) via x-y translation, rotation, and scale variation.
     Input args:
-        image : mindspore.Tensor, size H x W x 3
-        kp2ds : mindspore.Tensor, size N x K x 2/3, the K 2D joints of N people
+        image : np.array, size H x W x 3
+        kp2ds : np.array, size N x K x 2/3, the K 2D joints of N people
         crop_trbl : tuple, size 4, represent the cropped size on top, right, bottom, left side, Each entry may be a single int.
-        bbox : mindspore.Tensor/list/tuple, size 4, represent the left, top, right, bottom, we can derive the crop_trbl from the bbox
+        bbox : np.array/list/tuple, size 4, represent the left, top, right, bottom, we can derive the crop_trbl from the bbox
         pad_ratio : float, ratio = width / height
-        pad_trbl: mindspore.Tensor/list/tuple, size 4, represent the pad size on top, right, bottom, left side, Each entry may be a single int.
+        pad_trbl: np.array/list/tuple, size 4, represent the pad size on top, right, bottom, left side, Each entry may be a single int.
     return:
-        augmented image: mindspore.Tensor, size H x W x 3
+        augmented image: np.array, size H x W x 3
         augmented kp2ds if given, in the same size as input kp2ds
     '''
     if bbox is not None:
-        assert len(bbox) == 4, print('bbox input of image_crop_pad is supposed to be in length 4!, while {} is given'.format(bbox))
+        assert len(bbox) == 4, print(
+            'bbox input of image_crop_pad is supposed to be in length 4!, while {} is given'.format(bbox))
+
         def calc_crop_trbl_from_bbox(bbox, image_shape):
-            l,t,r,b = bbox
-            h,w = image_shape[:2]
-            return (int(max(0,t)), int(max(0,w-r)), int(max(0,h-b)), int(max(0,l)))
+            l, t, r, b = bbox
+            h, w = image_shape[:2]
+            return (int(max(0, t)), int(max(0, w - r)), int(max(0, h - b)), int(max(0, l)))
+
         crop_trbl = calc_crop_trbl_from_bbox(bbox, image.shape)
     crop_func = iaa.Sequential([iaa.Crop(px=crop_trbl, keep_size=False)])
-    image_aug = mindspore.Tensor(crop_func(image=image))
+    image_aug = np.array(crop_func(image=image))
     if pad_trbl is None:
         pad_trbl = compute_paddings_to_reach_aspect_ratio(image_aug.shape, pad_ratio)
     pad_func = iaa.Sequential([iaa.Pad(px=pad_trbl, keep_size=False)])
@@ -130,11 +141,11 @@ def image_crop_pad(image, kp2ds=None, crop_trbl=(0,0,0,0), bbox=None, pad_ratio=
         # org_shape = kp2ds.shape
         # kp2ds_ia = convert2keypointsonimage(kp2ds.reshape(-1, org_shape[-1]), image.shape)
         # kp2ds_aug = pad_func(keypoints=crop_func(keypoints=kp2ds_ia)).to_xy_array().reshape(org_shape)
-        leftTop = mindspore.Tensor([[crop_trbl[3]-pad_trbl[3], crop_trbl[0]-pad_trbl[0]]])
-        leftTop3 = mindspore.Tensor([[crop_trbl[3]-pad_trbl[3], crop_trbl[0]-pad_trbl[0], 0]])
-        invalid_mask = [kp2d<=0 for kp2d in kp2ds]
-        kp2ds_aug = [kp2d-leftTop if kp2d.shape[-1]==2 else kp2d-leftTop3 for kp2d in kp2ds]
-        for ind,iv_mask in enumerate(invalid_mask):
+        leftTop = np.array([[crop_trbl[3] - pad_trbl[3], crop_trbl[0] - pad_trbl[0]]])
+        leftTop3 = np.array([[crop_trbl[3] - pad_trbl[3], crop_trbl[0] - pad_trbl[0], 0]])
+        invalid_mask = [kp2d <= 0 for kp2d in kp2ds]
+        kp2ds_aug = [kp2d - leftTop if kp2d.shape[-1] == 2 else kp2d - leftTop3 for kp2d in kp2ds]
+        for ind, iv_mask in enumerate(invalid_mask):
             kp2ds_aug[ind][iv_mask] = -2.
         # if draw_kp_on_image:
         #     for inds, kp2d in enumerate(kp2ds):
@@ -142,14 +153,16 @@ def image_crop_pad(image, kp2ds=None, crop_trbl=(0,0,0,0), bbox=None, pad_ratio=
         #         image = kps.draw_on_image(image, size=7)
         #         kps_aug = convert2keypointsonimage(kp2ds_aug[inds,:,:2], image_aug.shape)
         #         image_aug = kps_aug.draw_on_image(image_aug, size=7)
-    return image_aug, kp2ds_aug, mindspore.Tensor([*image_aug.shape[:2], *crop_trbl, *pad_trbl])
-    
-def image_pad_white_bg(image, pad_trbl=None, pad_ratio=1.,pad_cval=255):
+    return image_aug, kp2ds_aug, np.array([*image_aug.shape[:2], *crop_trbl, *pad_trbl])
+
+
+def image_pad_white_bg(image, pad_trbl=None, pad_ratio=1., pad_cval=255):
     if pad_trbl is None:
         pad_trbl = compute_paddings_to_reach_aspect_ratio(image.shape, pad_ratio)
-    pad_func = iaa.Sequential([iaa.Pad(px=pad_trbl, keep_size=False,pad_mode='constant',pad_cval=pad_cval)])
+    pad_func = iaa.Sequential([iaa.Pad(px=pad_trbl, keep_size=False, pad_mode='constant', pad_cval=pad_cval)])
     image_aug = pad_func(image=image)
-    return image_aug, mindspore.Tensor([*image_aug.shape[:2], *[0,0,0,0], *pad_trbl])
+    return image_aug, np.array([*image_aug.shape[:2], *[0, 0, 0, 0], *pad_trbl])
+
 
 def process_image(originImage, full_kp2ds=None, augments=None, is_pose2d=[True], random_crop=False):
     orgImage_white_bg, pad_trbl = image_pad_white_bg(originImage)
@@ -165,12 +178,14 @@ def process_image(originImage, full_kp2ds=None, augments=None, is_pose2d=[True],
 
         if flip:
             originImage = np.fliplr(originImage)
-            full_kp2ds = [flip_kps(kps_i, width=originImage.shape[1], is_pose=is_2d_pose) for kps_i, is_2d_pose in zip(full_kp2ds, is_pose2d)]
+            full_kp2ds = [flip_kps(kps_i, width=originImage.shape[1], is_pose=is_2d_pose) for kps_i, is_2d_pose in
+                          zip(full_kp2ds, is_pose2d)]
 
     image_aug, kp2ds_aug, offsets = image_crop_pad(originImage, kp2ds=full_kp2ds, bbox=crop_bbox, pad_ratio=1.)
     return image_aug, orgImage_white_bg, kp2ds_aug, offsets
 
-def get_image_cut_box(leftTop, rightBottom, ExpandsRatio, Center = None, force_square=False):
+
+def get_image_cut_box(leftTop, rightBottom, ExpandsRatio, Center=None, force_square=False):
     ExpandsRatio = [ExpandsRatio, ExpandsRatio, ExpandsRatio, ExpandsRatio]
 
     def _expand_crop_box(lt, rb, scale):
@@ -178,9 +193,9 @@ def get_image_cut_box(leftTop, rightBottom, ExpandsRatio, Center = None, force_s
         xl, xr, yt, yb = lt[0] - center[0], rb[0] - center[0], lt[1] - center[1], rb[1] - center[1]
 
         xl, xr, yt, yb = xl * scale[0], xr * scale[1], yt * scale[2], yb * scale[3]
-        #expand it
-        lt, rb = mindspore.Tensor([center[0] + xl, center[1] + yt]), mindspore.Tensor([center[0] + xr, center[1] + yb])
-        lb, rt = mindspore.Tensor([center[0] + xl, center[1] + yb]), mindspore.Tensor([center[0] + xr, center[1] + yt])
+        # expand it
+        lt, rb = np.array([center[0] + xl, center[1] + yt]), np.array([center[0] + xr, center[1] + yb])
+        lb, rt = np.array([center[0] + xl, center[1] + yb]), np.array([center[0] + xr, center[1] + yt])
         center = (lt + rb) / 2
         return center, lt, rt, rb, lb
 
@@ -207,7 +222,7 @@ def get_image_cut_box(leftTop, rightBottom, ExpandsRatio, Center = None, force_s
 
 class RandomErasing(object):
     '''
-    Class that performs Random Erasing in Random Erasing Data Augmentation by Zhong et al. 
+    Class that performs Random Erasing in Random Erasing Data Augmentation by Zhong et al.
     -------------------------------------------------------------------------------------
     sl: min erasing area
     sh: max erasing area
@@ -215,19 +230,20 @@ class RandomErasing(object):
     mean: erasing value
     -------------------------------------------------------------------------------------
     '''
-    def __init__(self, sl = 0.01, sh = 0.03, r1 = 0.4, mean=[0.4914, 0.4822, 0.4465]):
+
+    def __init__(self, sl=0.01, sh=0.03, r1=0.4, mean=[0.4914, 0.4822, 0.4465]):
         self.mean = mean
         self.sl = sl
         self.sh = sh
         self.r1 = r1
-       
+
     def __call__(self, img):
         img_h, img_w, img_c = img.shape
         for attempt in range(100):
             area = img_h * img_w
-       
+
             target_area = random.uniform(self.sl, self.sh) * area
-            aspect_ratio = random.uniform(self.r1, 1/self.r1)
+            aspect_ratio = random.uniform(self.r1, 1 / self.r1)
 
             h = int(round(math.sqrt(target_area * aspect_ratio)))
             w = int(round(math.sqrt(target_area / aspect_ratio)))
@@ -235,72 +251,78 @@ class RandomErasing(object):
             if w < img_w and h < img_h:
                 x1 = random.randint(0, img_h - h)
                 y1 = random.randint(0, img_w - w)
-                img[x1:x1+h, y1:y1+w] = 0
+                img[x1:x1 + h, y1:y1 + w] = 0
 
                 return img
 
         return img
 
+
 RE = RandomErasing()
+
 
 def random_erase(image):
     return RE(image)
 
+
 def RGB_mix(image, pn):
     # in the rgb image we add pixel noise in a channel-wise manner
-    image[:,:,0] = np.minimum(255.0, np.maximum(0.0, image[:,:,0]*pn[0]))
-    image[:,:,1] = np.minimum(255.0, np.maximum(0.0, image[:,:,1]*pn[1]))
-    image[:,:,2] = np.minimum(255.0, np.maximum(0.0, image[:,:,2]*pn[2]))
+    image[:, :, 0] = np.minimum(255.0, np.maximum(0.0, image[:, :, 0] * pn[0]))
+    image[:, :, 1] = np.minimum(255.0, np.maximum(0.0, image[:, :, 1] * pn[1]))
+    image[:, :, 2] = np.minimum(255.0, np.maximum(0.0, image[:, :, 2] * pn[2]))
     return image
 
+
 def convert2keypointsonimage(kp2d, image_shape):
-    kps = KeypointsOnImage([Keypoint(x=x, y=y) for x,y in kp2d], shape=image_shape)
+    kps = KeypointsOnImage([Keypoint(x=x, y=y) for x, y in kp2d], shape=image_shape)
     return kps
+
 
 def img_kp_rotate(image, kp2ds=None, rotate=0):
     '''
     Perform augmentation of image (and kp2ds) via rotation.
     Input args:
-        image : mindspore.Tensor, size H x W x 3
-        kp2ds : mindspore.Tensor, size N x K x 2/3, the K 2D joints of N people
+        image : np.array, size H x W x 3
+        kp2ds : np.array, size N x K x 2/3, the K 2D joints of N people
         rotate : int, radians angle of rotation on image plane, such as 30 degree
     return:
-        augmented image: mindspore.Tensor, size H x W x 3
+        augmented image: np.array, size H x W x 3
         augmented kp2ds if given, in the same size as input kp2ds
     '''
     aug_list = []
     if rotate != 0:
         aug_list += [iaa.Affine(rotate=rotate)]
         aug_seq = iaa.Sequential(aug_list)
-        image_aug = mindspore.Tensor(aug_seq(image=image))
+        image_aug = np.array(aug_seq(image=image))
         if kp2ds is not None:
             kp2ds_aug = []
             for idx, kp2d in enumerate(kp2ds):
-                kps = convert2keypointsonimage(kp2d[:,:2], image.shape)
-                #image = kps.draw_on_image(image, size=7)
+                kps = convert2keypointsonimage(kp2d[:, :2], image.shape)
+                # image = kps.draw_on_image(image, size=7)
                 kps_aug = aug_seq(keypoints=kps)
-                #image_aug = kps_aug.draw_on_image(image_aug, size=7)
-                kp2d[:,:2] = kps_aug.to_xy_array()
+                # image_aug = kps_aug.draw_on_image(image_aug, size=7)
+                kp2d[:, :2] = kps_aug.to_xy_array()
                 kp2ds_aug.append(kp2d)
         else:
-            kp2ds_aug=None
+            kp2ds_aug = None
 
     if kp2ds is not None:
         return image_aug, kp2ds_aug
     else:
         return image_aug
 
+
 def img_kp_trans_rotate_scale(image, kp2ds=None, rotate=0, trans=None, scale=None):
     '''
     Perform augmentation of image (and kp2ds) via x-y translation, rotation, and scale variation.
     Input args:
-        image : mindspore.Tensor, size H x W x 3
-        kp2ds : mindspore.Tensor, size N x K x 2/3, the K 2D joints of N people
+        image : np.array, size H x W x 3
+        kp2ds : np.array, size N x K x 2/3, the K 2D joints of N people
         rotate : int, radians angle of rotation on image plane, such as 30 degree
-        trans : mindspore.Tensor/list/tuple, (tx, ty), translation on the image plane along x, y axis
-        scale : mindspore.Tensor/list/tuple, (sx, sy), scale variation on the image plane along x, y axis
+        trans : np.array/list/tuple, (tx, ty), translation on the image plane along x, y axis
+        scale : np.array/list/tuple, (sx, sy), scale variation on the image plane along x, y axis
     return:
-        augmented image: mindspore.Tensor, size H x W x 3
+        augmented image: np.array, size H x W x 3
         augmented kp2ds if given, in the same size as input kp2ds
     '''
     aug_list = []
@@ -313,39 +335,43 @@ def img_kp_trans_rotate_scale(image, kp2ds=None, rotate=0, trans=None, scale=Non
         aug_list += [iaa.Affine(scale=scale)]
 
     aug_seq = iaa.Sequential(aug_list)
-    image_aug = mindspore.Tensor(aug_seq(image=image))
+    image_aug = np.array(aug_seq(image=image))
     if kp2ds is not None:
         kp2ds_aug = []
         for idx, kp2d in enumerate(kp2ds):
-            kps = convert2keypointsonimage(kp2d[:,:2], image.shape)
+            kps = convert2keypointsonimage(kp2d[:, :2], image.shape)
             image = kps.draw_on_image(image, size=7)
             kps_aug = aug_seq(keypoints=kps)
             image_aug = kps_aug.draw_on_image(image_aug, size=7)
-            kp2d[:,:2] = kps_aug.to_xy_array()
+            kp2d[:, :2] = kps_aug.to_xy_array()
             kp2ds_aug.append(kp2d)
         return image_aug, kp2ds_aug
     else:
         return image_aug
 
+
 def augment_blur(image):
     choise = np.random.randint(4)
-    if choise==0:
-        image = cv2.blur(image,(3,3))
-    elif choise==1:
-        image = cv2.GaussianBlur(image,(3,3),0)
-    elif choise==2:
-        image = cv2.medianBlur(image,3)
-    elif choise==3:
-        sigma = np.random.randint(20,30)
-        image = cv2.bilateralFilter(image,3,sigma,sigma)
+    if choise == 0:
+        image = cv2.blur(image, (3, 3))
+    elif choise == 1:
+        image = cv2.GaussianBlur(image, (3, 3), 0)
+    elif choise == 2:
+        image = cv2.medianBlur(image, 3)
+    elif choise == 3:
+        sigma = np.random.randint(20, 30)
+        image = cv2.bilateralFilter(image, 3, sigma, sigma)
     return image
+
 
 '''
 brought from https://github.com/isarandi/synthetic-occlusion/blob/master/augmentation.py
 
 '''
+
+
 class Synthetic_occlusion(object):
-    def __init__(self,path):
+    def __init__(self, path):
         print('Loading occluders from Pascal VOC dataset...')
         # path = 'something/something/VOCtrainval_11-May-2012/VOCdevkit/VOC2012'
         self.occluders = load_occluders(pascal_voc_root_path=path)
@@ -359,7 +385,7 @@ class Synthetic_occlusion(object):
 def load_occluders(pascal_voc_root_path):
     occluders = []
     structuring_element = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
-    
+
     annotation_paths = list_filepaths(os.path.join(pascal_voc_root_path, 'Annotations'))
     for annotation_path in annotation_paths:
         xml_root = xml.etree.ElementTree.parse(annotation_path).getroot()
@@ -385,13 +411,13 @@ def load_occluders(pascal_voc_root_path):
         seg_filename = im_filename.replace('jpg', 'png')
 
         im_path = os.path.join(pascal_voc_root_path, 'JPEGImages', im_filename)
-        seg_path = os.path.join(pascal_voc_root_path,'SegmentationObject', seg_filename)
+        seg_path = os.path.join(pascal_voc_root_path, 'SegmentationObject', seg_filename)
 
         im = np.asarray(PIL.Image.open(im_path))
         labels = np.asarray(PIL.Image.open(seg_path))
 
         for i_obj, (xmin, ymin, xmax, ymax) in boxes:
-            object_mask = (labels[ymin:ymax, xmin:xmax] == i_obj + 1).astype(np.uint8)*255
+            object_mask = (labels[ymin:ymax, xmin:xmax] == i_obj + 1).astype(np.uint8) * 255
             object_image = im[ymin:ymax, xmin:xmax]
             if cv2.countNonZero(object_mask) < 500:
                 # Ignore small objects
@@ -401,7 +427,7 @@ def load_occluders(pascal_voc_root_path):
             eroded = cv2.erode(object_mask, structuring_element)
             object_mask[eroded < object_mask] = 192
             object_with_mask = np.concatenate([object_image, object_mask[..., np.newaxis]], axis=-1)
-            
+
             # Downscale for efficiency
             object_with_mask = resize_by_factor(object_with_mask, 0.5)
             occluders.append(object_with_mask)
@@ -424,7 +450,7 @@ def occlude_with_objects(im, occluders):
         scale_factor = random_scale_factor * im_scale_factor
         occluder = resize_by_factor(occluder, scale_factor)
 
-        center = np.random.uniform([0,0], width_height)
+        center = np.random.uniform([0, 0], width_height)
         paste_over(im_src=occluder, im_dst=result, center=center)
 
     return result
@@ -457,7 +483,7 @@ def paste_over(im_src, im_dst, center):
     end_src = width_height_src + (end_dst - raw_end_dst)
     region_src = im_src[start_src[1]:end_src[1], start_src[0]:end_src[0]]
     color_src = region_src[..., 0:3]
-    alpha = region_src[..., 3:].astype(mindspore.float32)/255
+    alpha = region_src[..., 3:].astype(np.float32) / 255
 
     im_dst[start_dst[1]:end_dst[1], start_dst[0]:end_dst[0]] = (
             alpha * color_src + (1 - alpha) * region_dst)
@@ -467,7 +493,7 @@ def resize_by_factor(im, factor):
     """Returns a copy of `im` resized by `factor`, using bilinear interp for up and area interp
     for downscaling.
     """
-    new_size = tuple(np.round(mindspore.Tensor([im.shape[1], im.shape[0]]) * factor).astype(int))
+    new_size = tuple(np.round(np.array([im.shape[1], im.shape[0]]) * factor).astype(int))
     interp = cv2.INTER_LINEAR if factor > 1.0 else cv2.INTER_AREA
     return cv2.resize(im, new_size, fx=factor, fy=factor, interpolation=interp)
 
@@ -477,14 +503,15 @@ def list_filepaths(dirpath):
     paths = [os.path.join(dirpath, name) for name in names]
     return sorted(filter(os.path.isfile, paths))
 
+
 if __name__ == '__main__':
     image = ia.quokka(size=(512, 256))
-    kps = mindspore.Tensor([[[65,100],[75,200],[100,100],[200,80]]])
+    kps = np.array([[[65, 100], [75, 200], [100, 100], [200, 80]]])
     bbox = []
     image_aug, pad_trbl = image_pad_white_bg(image)
     print(pad_trbl)
-    #image, image_after, kps_aug = img_kp_trans_rotate_scale(image, kp2ds=kps, rotate=30, trans=(10,0)) #, scale=(1,1)
-    #image, image_aug, kp2ds_aug = image_crop_pad(image, kp2ds=kps, crop_trbl=(20,30,40,50), bbox=None, pad_ratio=1., pad_trbl=None, draw_kp_on_image=True)
-    #ia.imshow(image)
+    # image, image_after, kps_aug = img_kp_trans_rotate_scale(image, kp2ds=kps, rotate=30, trans=(10,0)) #, scale=(1,1)
+    # image, image_aug, kp2ds_aug = image_crop_pad(image, kp2ds=kps, crop_trbl=(20,30,40,50), bbox=None, pad_ratio=1., pad_trbl=None, draw_kp_on_image=True)
+    # ia.imshow(image)
     ia.imshow(image_aug)
-    #cv2.imwrite('image_before_after.png', np.concatenate([image,image_after], 1))
+    # cv2.imwrite('image_before_after.png', np.concatenate([image,image_after], 1))

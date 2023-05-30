@@ -17,6 +17,7 @@ import logging
 import scipy.io as scio
 # import quaternion
 from PIL import Image
+from mindspore.dataset import GeneratorDataset
 # from torch.utils.data import Dataset, DataLoader
 from collections import OrderedDict
 
@@ -182,6 +183,12 @@ class Image_base:
 
         if 'seq_info' in info:
             input_data.update({'seq_info': mindspore.Tensor(info['seq_info'])})
+        np_input_data = {}
+        for key, data in input_data.items():
+            if isinstance(data, mindspore.Tensor):
+                np_input_data[key] = data.numpy()
+            elif isinstance(data, str):
+                np_input_data[key] = np.array(data)
         return input_data
 
     def _calc_augment_confs(self, image, full_kp2ds, is_pose2d=None):
@@ -199,7 +206,7 @@ class Image_base:
             scale = np.random.rand() * (self.scale_range[1] - self.scale_range[0]) + self.scale_range[0]
 
             crop_person_number = np.random.randint(len(is_pose2d)) + 1
-            sample_ids = mindspore.Tensor(random.sample(list(range(len(full_kp2ds))), crop_person_number))
+            sample_ids = np.array(random.sample(list(range(len(full_kp2ds))), crop_person_number))
 
             bboxes = []
             if is_pose2d[sample_ids].sum() > 0:
@@ -256,6 +263,7 @@ class Image_base:
         return centermap_3d, valid_centermap3d_mask
 
     def map_kps(self, joint_org, maps=None):
+        # print(type(maps), type(joint_org))
         kps = joint_org[maps].copy()
         kps[maps == -1] = -2.
         return kps
@@ -596,13 +604,16 @@ def _calc_bbox_normed(full_kps):
 
 
 def _check_minus2_error_(kp3ds, acceptable_list=[-2., 0.]):
+    print(kp3ds.shape)
     kp3ds_flatten = kp3ds[:, 1:].reshape(-1, 3)
+
     for kp3d in kp3ds_flatten:
         if kp3d[0] in acceptable_list and kp3d[1] in acceptable_list and kp3d[2] in acceptable_list:
             continue
-
+        print('=======================================')
         equal_kp_value = (kp3ds_flatten[:, 0] == kp3d[0]).long() + (kp3ds_flatten[:, 1] == kp3d[1]).long() + (
                     kp3ds_flatten[:, 2] == kp3d[2]).long()
+
         equal_mask = equal_kp_value == 3
         if equal_mask.sum() > 3:
             print(ops.where((kp3ds[:, :] == kp3d).sum(-1) == 3))
@@ -659,8 +670,10 @@ def test_image_dataset(dataset, with_3d=False, with_smpl=False):
     print('Initialized dataset')
 
     batch_size, model_type = 2, 'smpl'
-    dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, \
-                            drop_last=False, pin_memory=True, num_workers=1)
+    # dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, \
+    #                         drop_last=False, pin_memory=True, num_workers=1)
+    dataloader = GeneratorDataset(source=dataset, column_names=[f'{i}' for i in range(1)], shuffle=True)
+    dataloader = dataloader.batch(batch_size=batch_size)
     visualizer = Visualizer(resolution=(512, 512, 3), result_img_dir=save_dir, with_renderer=True)
 
     from visualization.visualization import make_heatmaps
@@ -673,7 +686,8 @@ def test_image_dataset(dataset, with_3d=False, with_smpl=False):
     img_size = 512
     bones, cm = constants.All54_connMat, constants.cm_All54
 
-    for _, r in enumerate(dataloader):
+    for _, r in enumerate(dataloader.create_tuple_iterator()):
+        r = r[0]
         if _ % 100 == 0:
             print_data_shape(r)
         _check_minus2_error_(r['kp_3d'])

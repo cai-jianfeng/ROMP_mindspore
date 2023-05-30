@@ -320,7 +320,7 @@ class CenterMap(object):
             mask[:] = True
         else:
             mask = topk_score > self.conf_thresh
-        batch_ids = ops.where(mask)[0]
+        batch_ids = ops.nonzero(mask)[:, 0]
         center_yxs = ops.stack([topk_ys[mask], topk_xs[mask]]).permute((1, 0))
         return batch_ids, topk_inds[mask], center_yxs, topk_score[mask]
 
@@ -379,7 +379,7 @@ def _calc_radius_(bboxes_hw_norm, map_size=64):
         return []
     minimum_radius = map_size / 32.
     scale_factor = map_size / 16.
-    scales = np.linalg.norm(mindspore.Tensor(bboxes_hw_norm) / 2, ord=2, axis=1)
+    scales = np.linalg.norm(np.array(bboxes_hw_norm)/2, ord=2, axis=1)
     radius = (scales * scale_factor + minimum_radius).astype(np.uint8)
     return radius
 
@@ -399,12 +399,17 @@ def gather_feature(fmap, index, mask=None, use_transform=False):
 
     dim = fmap.shape[-1]
     index = index.unsqueeze(len(index.shape))
-    index = ops.broadcast_to(index, (*index.shape, dim))
-    fmap = fmap.gather(axis=1, index=index)
+    # print(index.shape, '; ', (*index.shape, dim))
+    # index = ops.broadcast_to(index, (dim, *index.shape)).permute((*[i+1 for i in range(len(index.shape))], 0))
+    # print(index.shape)
+    # fmap = fmap.gather(axis=1, index=index)
+    # print(fmap.shape, '; ', index.shape)
+    fmap = ops.gather_elements(fmap, dim=1, index=index)
     if mask is not None:
         mask = mask.unsqueeze(2).expand_as(fmap)
         fmap = fmap[mask]
         fmap = fmap.reshape((-1, dim))
+    # print(fmap)
     return fmap
 
 

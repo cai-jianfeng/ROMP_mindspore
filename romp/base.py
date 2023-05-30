@@ -50,14 +50,15 @@ class Base(object):
                 model = load_model(self.model_path, model, prefix='module.', drop_prefix=drop_prefix, fix_loaded=False)
                 train_entire_model(model)
         if self.distributed_training:  # 不会进入
-            print('local_rank', self.local_rank)
-            device = mindspore.set_context('cuda', self.local_rank)
-            mindspore.set_contexte(self.local_rank)
-            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-            torch.distributed.init_process_group(backend='nccl')
-            assert torch.distributed.is_initialized()
-            self.model = nn.parallel.DistributedDataParallel(model.to(device), device_ids=[self.local_rank],
-                                                             output_device=self.local_rank, find_unused_parameters=True)
+            # print('local_rank', self.local_rank)
+            # device = mindspore.set_context('cuda', self.local_rank)
+            # mindspore.set_contexte(self.local_rank)
+            # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            # torch.distributed.init_process_group(backend='nccl')
+            # assert torch.distributed.is_initialized()
+            # self.model = nn.parallel.DistributedDataParallel(model.to(device), device_ids=[self.local_rank],
+            #                                                  output_device=self.local_rank, find_unused_parameters=True)
+            pass
         else:
             if self.master_batch_size != -1:  # 不会进入
                 # balance the multi-GPU memory via adjusting the batch size of each GPU.
@@ -133,11 +134,13 @@ class Base(object):
         if self.model_precision == 'fp16':
             # with autocast():
             #     outputs = model(meta_data, **cfg_dict)
-            amp_level = "O3"
-            model = auto_mixed_precision(model, amp_level)
+            # amp_level = "O3"
+            # model = auto_mixed_precision(model, amp_level)
+            # print(cfg_dict)
             outputs = model(meta_data, **cfg_dict)
         else:
             outputs = model(meta_data, **self.train_cfg)
+        print('========output success===================')
         meta_data.update({'imgpath': imgpath_org, 'data_set': ds_org})
         outputs['meta_data']['data_set'], outputs['meta_data']['imgpath'] = reorganize_items([ds_org, imgpath_org], outputs['reorganize_idx'].numpy())
         return outputs
@@ -147,6 +150,7 @@ class Base(object):
         print(self.dataset)
         print(self.sample_prob_dict)
         datasets = MixedDataset(self.dataset.split(','), self.sample_prob_dict, train_flag=train_flag)
+        print(datasets[0][0].shape)
         batch_size = self.batch_size if train_flag else self.val_batch_size
         if self.distributed_training:  # 不会进入
             pass
@@ -161,7 +165,8 @@ class Base(object):
             #                   batch_size=batch_size, shuffle=True,
             #                   drop_last=True if train_flag else False, pin_memory=True, num_workers=self.nw)
             # datasets = datasets.shuffle(buffer_size=len(datasets))
-            datasets = mindspore.dataset.GeneratorDataset(datasets, shuffle=True, num_parallel_workers=self.nw)
+            # datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(1)], shuffle=True, num_parallel_workers=self.nw)
+            datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(19)], shuffle=True)
             datasets = datasets.batch(batch_size=batch_size, drop_remainder=True if train_flag else False)
             return datasets
 
@@ -170,7 +175,7 @@ class Base(object):
         datasets = SingleDataset(**kwargs)
         # if shuffle:
         #     datasets = datasets.shuffle(buffer_size=len(datasets))
-        datasets = mindspore.dataset.GeneratorDataset(datasets, shuffle=shuffle)
+        datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(1)], shuffle=shuffle)
         datasets = datasets.batch(batch_size=self.val_batch_size, drop_remainder=drop_last)
         return datasets
         # return DataLoader(dataset=datasets, shuffle=shuffle, batch_size=self.val_batch_size,

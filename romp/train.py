@@ -1,21 +1,33 @@
-from .base import *
-from .eval import val_result
+import sys, os
+sys.path.append(os.path.join(os.getcwd(), 'lib/'))
+print(sys.path)
+# from .base import *
+from base import *
+# from .eval import val_result
+from eval import val_result
 from loss_funcs import Loss, Learnable_Loss
 from collections import Iterable
 import mindspore as ms
-
+# hello world!
 np.set_printoptions(precision=2, suppress=True)
 
 
 class Trainer(Base):
     def __init__(self):
         super(Trainer, self).__init__()
+        self.keys = ['image', 'image_org', 'full_kp2d',
+                     'person_centers', 'subject_ids', 'centermap',
+                     'kp_3d', 'verts', 'params', 'valid_masks',
+                     'root_trans', 'offsets', 'rot_flip',
+                     'all_person_detected_mask', 'imgpath', 'data_set',
+                     'camMats', 'camDists', 'img_scale']
         self._build_model_()
         self._build_optimizer()
         self.set_up_val_loader()
         self._calc_loss = Loss()
         self.loader = self._create_data_loader(train_flag=True)
-        self.merge_losses = Learnable_Loss(self.loader.dataset._get_ID_num_())  # .cuda()
+        # self.merge_losses = Learnable_Loss(self.loader._get_ID_num_())  # .cuda()
+        self.merge_losses = Learnable_Loss()
 
         self.train_cfg = {'mode': 'matching_gts', 'is_training': True, 'update_data': True,
                           'calc_loss': True if self.model_return_loss else False,
@@ -39,12 +51,14 @@ class Trainer(Base):
                 train_entire_model(self.model)
 
             self.train_epoch(epoch)
-            print('===check===')
         # 这是 torch 的 SummaryWriter
         # self.summary_writer.close()
         
     # TODO: 修改 train_step 成 mindspore 的格式 => 相当于 mindspore 文档的快速入门中的 forward_fn, 执行前向过程并放回 loss
     def train_step(self, meta_data):
+        # 这里需要重新组装meta_data
+        dict_data = {self.keys[i]: value for i, value in enumerate(meta_data)}
+        meta_data = dict_data
         # self.optimizer.zero_grad()
         outputs = self.network_forward(self.model, meta_data, self.train_cfg)
 
@@ -99,33 +113,15 @@ class Trainer(Base):
         run_time, data_time, losses = [AverageMeter() for i in range(3)]
         losses_dict = AverageMeter_Dict()
         batch_start_time = time.time()
-        print('===check1===')
-        # print(self.loader._iterator)
-        # print(self.loader)
-        # print(isinstance(self.loader, Iterable))
-        # print(len(self.loader))
-        # print(enumerate(self.loader))
-        # print('===============')
-        # print(self.loader.batch_sampler)
-        # print(self.loader.batch_size)
-        # print(self.loader.check_worker_number_rationality())
-        # print(self.loader.dataset)
-        # print(self.loader.collate_fn)
-        # print(self.loader.drop_last)
-        # print(self.loader.generator)
-        # print(self.loader.num_workers)
-        # print(self.loader.pin_memory)
-        # print(self.loader.pin_memory_device)
-        # print(self.loader.sampler)
-        # print(self.loader._iterator)
-        # print('===============')
-        for iter_index, meta_data in enumerate(self.loader.create_dict_iterator()):
-            print('===check===')
+        print('===begin===')
+        # print(self.loader.create_tuple_iterator().__next__())
+
+        for iter_index, meta_data in enumerate(self.loader.create_tuple_iterator()):
             if self.fast_eval_iter == 0:
                 self.validation(epoch)
                 break
             self.global_count += 1
-
+            # print(type(meta_data), len(meta_data), meta_data[0].shape)  # 这时候的 meta_data 已经
             if args().new_training:  # 不会进入
                 if self.global_count == args().new_training_iters:
                     self.train_cfg['new_training'], self.val_cfg['new_training'], self.eval_cfg['new_training'] = False, False, False
@@ -210,4 +206,5 @@ def main():
 
 
 if __name__ == '__main__':
+    ms.context.set_context(device_target="CPU")
     main()

@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import mindspore as ms
 from mindspore import nn, ops
-
+import numpy as np
 import sys, os
 
 root_dir = os.path.join(os.path.dirname(__file__), '..')
@@ -58,6 +58,8 @@ class ROMP(Base):
         params_num, cam_dim = self._result_parser.params_map_parser.params_num, 3
         if isinstance(params_num, ms.Tensor):
             params_num = params_num.numpy().item()
+        elif isinstance(params_num, np.ndarray):
+            params_num = params_num.item()
         self.head_cfg = {'NUM_HEADS': 1, 'NUM_CHANNELS': 64, 'NUM_BASIC_BLOCKS': args().head_block_num}
         self.output_cfg = {'NUM_PARAMS_MAP': params_num - cam_dim, 'NUM_CENTER_MAP': 1, 'NUM_CAM_MAP': cam_dim}
 

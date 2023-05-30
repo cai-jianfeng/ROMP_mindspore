@@ -36,8 +36,9 @@ class Base(nn.Cell):
 
     def matching_forward(self, meta_data, **cfg):
         outputs = self.feed_forward(meta_data)
+        print('===============feed forward succeed============')
         outputs, meta_data = self._result_parser.matching_forward(outputs, meta_data, cfg)
-
+        print('===============matching forward succeed============')
         outputs['meta_data'] = meta_data
         if cfg['calc_loss']:
             outputs.update(self._calc_loss(outputs))

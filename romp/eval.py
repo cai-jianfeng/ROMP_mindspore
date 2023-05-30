@@ -1,4 +1,5 @@
-from .base import *
+# from .base import *
+from base import *
 from loss_funcs import _calc_MPJAE, calc_mpjpe, calc_pampjpe, calc_pck, align_by_parts
 from evaluation import h36m_evaluation_act_wise, cmup_evaluation_act_wise
 from evaluation.evaluation_matrix import _calc_relative_age_error_weak_, _calc_absolute_depth_error, \

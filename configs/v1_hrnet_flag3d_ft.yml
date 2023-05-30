@@ -38,7 +38,7 @@ ARGS:
  centermap_size: 64
  centermap_conf_thresh: 0.2
 
- model_path: /root/ROMP/trained_models/ROMP_HRNet32_V1.pkl
+ model_path: /home/jianfeng_intern/ROMP/ROMP-master/trained_models/ROMP_HRNet32_V1.pkl
 
 loss_weight:
   MPJPE: 200.
