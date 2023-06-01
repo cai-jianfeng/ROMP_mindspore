@@ -190,6 +190,8 @@ class ResultParser(nn.Cell):
             mc.update({'batch_ids': [0], 'matched_ids': [0], 'person_ids': [0], 'conf': [0]})
         keys_list = list(mc.keys())
         for key in keys_list:
+            for i, value in enumerate(mc[key]):
+                mc[key][i] = value.numpy()
             if key == 'conf':
                 mc[key] = mindspore.Tensor(mc[key])
             else:
@@ -250,9 +252,9 @@ class ResultParser(nn.Cell):
             keys_list = list(mc.keys())
             for key in keys_list:
                 if key != 'conf':
-                    print(type(mc[key]))
-                    for i in mc[key]:
-                        print(i.shape)
+                    # print(type(mc[key]))
+                    for i, value in enumerate(mc[key]):
+                        mc[key][i] = value.numpy()
                     mc[key] = mindspore.Tensor(mc[key]).long()
                 if args().max_supervise_num != -1 and is_training:
                     mc[key] = mc[key][:args().max_supervise_num]

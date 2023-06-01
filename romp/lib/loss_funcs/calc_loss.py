@@ -34,7 +34,7 @@ class Loss(nn.Cell):
         if args().HMloss_type=='focal':
             args().heatmap_weight /=1000
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-1)
-        self.joint_lossweights = mindspore.Tensor(constants.SMPL54_weights).float()
+        self.joint_lossweights = mindspore.Tensor.from_numpy(constants.SMPL54_weights).float()
         self.align_inds_MPJPE = mindspore.Tensor([constants.SMPL_ALL_54['L_Hip'], constants.SMPL_ALL_54['R_Hip']])
         self.shape_pca_weight = mindspore.Tensor([1, 0.64, 0.32, 0.32, 0.16, 0.16, 0.16, 0.16, 0.16, 0.16]).unsqueeze(0).float()
 
@@ -61,7 +61,7 @@ class Loss(nn.Cell):
             if isinstance(loss_dict[name],tuple):
                 loss_dict[name] = loss_dict[name][0]
             elif isinstance(loss_dict[name],int):
-                loss_dict[name] = ops.zeros(1,device=outputs[list(outputs.keys())[0]].device)
+                loss_dict[name] = ops.zeros(1)
             loss_dict[name] = loss_dict[name].mean() * eval('args().{}_weight'.format(name))
 
         return {'loss_dict':loss_dict, 'kp_error':kp_error}
@@ -69,41 +69,40 @@ class Loss(nn.Cell):
     def _calc_detection_loss(self, outputs, meta_data):
         detect_loss_dict = {'CenterMap': 0}
         if args().calc_mesh_loss and 'center_map' in outputs:
-            all_person_mask = meta_data['all_person_detected_mask'].to(
-                outputs['center_map'].device)
+            all_person_mask = meta_data['all_person_detected_mask']
             if all_person_mask.sum()>0:
-                detect_loss_dict['CenterMap'] = focal_loss(outputs['center_map'][all_person_mask], \
-                    meta_data['centermap'][all_person_mask].to(outputs['center_map'].device)) 
+                detect_loss_dict['CenterMap'] = focal_loss(outputs['center_map'][all_person_mask],
+                                                           meta_data['centermap'][all_person_mask])
 
         reorganize_idx_on_each_gpu = outputs['reorganize_idx']-outputs['meta_data']['batch_ids'][0]
 
         if 'center_map_3d' in outputs:
             detect_loss_dict['CenterMap_3D'] = 0
-            valid_mask_c3d = meta_data['valid_centermap3d_mask'].squeeze().to(outputs['center_map_3d'].device)
+            valid_mask_c3d = meta_data['valid_centermap3d_mask'].squeeze()
             valid_mask_c3d = valid_mask_c3d.reshape(-1)
             if meta_data['valid_centermap3d_mask'].sum()>0:
-                detect_loss_dict['CenterMap_3D'] = focal_loss_3D(outputs['center_map_3d'][valid_mask_c3d], meta_data['centermap_3d'][valid_mask_c3d].to(outputs['center_map_3d'].device))
+                detect_loss_dict['CenterMap_3D'] = focal_loss_3D(outputs['center_map_3d'][valid_mask_c3d], meta_data['centermap_3d'][valid_mask_c3d])
             
         return detect_loss_dict
 
     def _calc_keypoints_loss(self, outputs, meta_data, matched_mask):
         kp_loss_dict, error = {'P_KP2D':0, 'MPJPE':0, 'PAMPJPE':0}, {'3d':{'error':[], 'idx':[]},'2d':{'error':[], 'idx':[]}}
         if 'pj2d' in outputs:
-            real_2d = meta_data['full_kp2d'].to(outputs['pj2d'].device)
+            real_2d = meta_data['full_kp2d']
             if args().model_version == 3:
                 kp_loss_dict['joint_sampler'] = self.joint_sampler_loss(real_2d, outputs['joint_sampler_pred'])
 
-            kp_loss_dict['P_KP2D'] = batch_kp_2d_l2_loss(real_2d.float().clone(), outputs['pj2d'].float().clone())
+            kp_loss_dict['P_KP2D'] = batch_kp_2d_l2_loss(real_2d.float().copy(), outputs['pj2d'].float().copy())
         
             kp3d_mask = meta_data['valid_masks'][:,1]
         
         if kp3d_mask.sum()>1 and 'j3d' in outputs:
-            kp3d_gt = meta_data['kp_3d'].contiguous().to(outputs['j3d'].device)
-            preds_kp3d = outputs['j3d'][:, :kp3d_gt.shape[1]].contiguous()
+            kp3d_gt = meta_data['kp_3d']
+            preds_kp3d = outputs['j3d'][:, :kp3d_gt.shape[1]]
 
             if not args().model_return_loss and args().PAMPJPE_weight>0:
                 try:
-                    pampjpe_each = calc_pampjpe(kp3d_gt[kp3d_mask].contiguous(), preds_kp3d[kp3d_mask].contiguous())
+                    pampjpe_each = calc_pampjpe(kp3d_gt[kp3d_mask], preds_kp3d[kp3d_mask])
                     kp_loss_dict['PAMPJPE'] = pampjpe_each
                 except Exception as exp_error:
                     print('PA_MPJPE calculation failed!', exp_error)
@@ -111,10 +110,10 @@ class Loss(nn.Cell):
             if args().MPJPE_weight>0:
                 fit_mask = kp3d_mask.bool()
                 if fit_mask.sum()>0:
-                    mpjpe_each = calc_mpjpe(kp3d_gt[fit_mask].contiguous(), preds_kp3d[fit_mask].contiguous(), align_inds=self.align_inds_MPJPE)
+                    mpjpe_each = calc_mpjpe(kp3d_gt[fit_mask], preds_kp3d[fit_mask], align_inds=self.align_inds_MPJPE)
                     kp_loss_dict['MPJPE'] = mpjpe_each
-                    error['3d']['error'].append(mpjpe_each.detach()*1000)
-                    error['3d']['idx'].append(ops.where(fit_mask)[0])
+                    error['3d']['error'].append(mpjpe_each*1000)
+                    error['3d']['idx'].append(ops.nonzero(fit_mask)[:, 0])
 
         return kp_loss_dict, error
 
@@ -125,19 +124,19 @@ class Loss(nn.Cell):
         
         if 'params' in outputs:
             _check_params_(meta_data['params'])
-            device = outputs['params']['body_pose'].device
-            grot_masks, smpl_pose_masks, smpl_shape_masks = meta_data['valid_masks'][:,3].to(device), meta_data['valid_masks'][:,4].to(device), meta_data['valid_masks'][:,5].to(device)
+            # device = outputs['params']['body_pose'].device
+            grot_masks, smpl_pose_masks, smpl_shape_masks = meta_data['valid_masks'][:,3], meta_data['valid_masks'][:,4], meta_data['valid_masks'][:,5]
 
             if grot_masks.sum()>0:
-                params_loss_dict['Pose'] += batch_smpl_pose_l2_error(meta_data['params'][grot_masks,:3].to(device).contiguous(), outputs['params']['global_orient'][grot_masks].contiguous()).mean()
+                params_loss_dict['Pose'] += batch_smpl_pose_l2_error(meta_data['params'][grot_masks,:3], outputs['params']['global_orient'][grot_masks]).mean()
 
             if smpl_pose_masks.sum()>0:
-                params_loss_dict['Pose'] += batch_smpl_pose_l2_error(meta_data['params'][smpl_pose_masks,3:22*3].to(device).contiguous(), outputs['params']['body_pose'][smpl_pose_masks,:21*3].contiguous()).mean()
+                params_loss_dict['Pose'] += batch_smpl_pose_l2_error(meta_data['params'][smpl_pose_masks,3:22*3], outputs['params']['body_pose'][smpl_pose_masks,:21*3]).mean()
 
             if smpl_shape_masks.sum()>0:
                 # beta annots in datasets are for each gender (male/female), not for our neutral. 
-                smpl_shape_diff = meta_data['params'][smpl_shape_masks,-10:].to(device).contiguous() - outputs['params']['betas'][smpl_shape_masks,:10].contiguous()
-                params_loss_dict['Shape'] += ops.norm(smpl_shape_diff*self.shape_pca_weight.to(device), p=2, axis=-1).mean() / 20.
+                smpl_shape_diff = meta_data['params'][smpl_shape_masks,-10:] - outputs['params']['betas'][smpl_shape_masks,:10]
+                params_loss_dict['Shape'] += ops.norm(smpl_shape_diff*self.shape_pca_weight, p=2, axis=-1).mean() / 20.
 
             if (~smpl_shape_masks).sum()>0:
                 params_loss_dict['Shape'] += (outputs['params']['betas'][~smpl_shape_masks,:10]**2).mean() / 20.

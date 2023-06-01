@@ -71,6 +71,7 @@ def FLAG3D(base_class=default_mode):
         def load_dataset(self):
             for root, names, _ in os.walk(self.img_folder):
                 break
+            # print(root, names)
             train_names, test_names = train_test_split(names)
             self.train_names = sorted(train_names)
             self.frames = []
@@ -98,16 +99,18 @@ def FLAG3D(base_class=default_mode):
             kp3d = np.load(os.path.join(self.kpts_folder_3d,
                                         inverse_symbol(self.train_names[seq_id])[:4] + "C001" + self.train_names[
                                             seq_id]) + ".npy")[frame_id]
+            # print('01')
             kp3d = preprocess(kp3d)
             kp3d = self.map_kps(kp3d, self.joint3d_mapper)
-
+            # print('02')
             f = open(os.path.join(self.kpts_folder_2d, self.train_names[seq_id]) + ".pkl", 'rb')
             kp2d = pickle.load(f, encoding='latin1')["keypoint"][0, frame_id, :, :]
             kp2d_gt = self.map_kps(kp2d, self.joint_mapper)
-
+            # print('03')
             param = joblib.load(os.path.join(self.param_folder,
                                              inverse_symbol(self.train_names[seq_id])[:4] + "C001" + self.train_names[
                                                  seq_id]) + ".pkl")
+            # print('04')
             pose_param = param["poses"][frame_id]
             beta_param = param["shapes"][0]
             pose_param[:3] = param["Rh"][frame_id]

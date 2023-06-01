@@ -169,6 +169,7 @@ def reorganize_items(items, reorganize_idx):
     items_new = [[] for _ in range(len(items))]
     for idx, item in enumerate(items):
         for ridx in reorganize_idx:
+            print(ridx)
             items_new[idx].append(item[ridx])
     return items_new
 

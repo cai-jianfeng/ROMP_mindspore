@@ -108,21 +108,17 @@ class Image_base:
         # 1: 3D pose, 2: subject id, 3: smpl root rot, 4: smpl pose param, 5: smpl shape param, 6: verts, 7:depth
         valid_masks = np.zeros((self.max_person, 8), dtype=np.bool_)
         info = self.get_image_info(index)
-
         position_augments, pixel_augments = self._calc_augment_confs(info['image'], info['kp2ds'],
                                                                      is_pose2d=info['vmask_2d'][:, 0])
-
         img_info = process_image(info['image'], info['kp2ds'], augments=position_augments,
                                  is_pose2d=info['vmask_2d'][:, 0])
         image, image_wbg, full_kps, offsets = img_info
         centermap, person_centers, full_kp2ds, used_person_inds, valid_masks[:, 0], bboxes_hw_norm, heatmap, AE_joints = \
             self.process_kp2ds_bboxes(full_kps, img_shape=image.shape, is_pose2d=info['vmask_2d'][:, 0])
-
         all_person_detected_mask = info['vmask_2d'][0, 2]
         subject_ids, valid_masks[:, 2] = self.process_suject_ids(info['track_ids'], used_person_inds,
                                                                  valid_mask_ids=info['vmask_2d'][:, 1])
         image, dst_image, org_image = self.prepare_image(image, image_wbg, augments=pixel_augments)
-
         # valid mask of 3D pose, smpl root rot, smpl pose param, smpl shape param, global translation
         kp3d, valid_masks[:, 1] = self.process_kp3ds(info['kp3ds'], used_person_inds,
                                                      augments=position_augments,
@@ -185,10 +181,14 @@ class Image_base:
             input_data.update({'seq_info': mindspore.Tensor(info['seq_info'])})
         np_input_data = {}
         for key, data in input_data.items():
+            if isinstance(data, mindspore.Temsor):
+                if data.dtype == mindspore.float64:
+                    input_data[key] = data.astype(mindspore.float32)
+        for key, data in input_data.items():
             if isinstance(data, mindspore.Tensor):
                 np_input_data[key] = data.numpy()
-            elif isinstance(data, str):
-                np_input_data[key] = np.array(data)
+            # elif isinstance(data, str):
+            #     np_input_data[key] = np.array(data)
         return input_data
 
     def _calc_augment_confs(self, image, full_kp2ds, is_pose2d=None):
@@ -216,7 +216,6 @@ class Image_base:
                 xys = xys[valid_xys]
                 bboxes.append(xys)
             # if crop_person_number==0 and len(full_kp2ds) and random.random()<0.1
-            # TODO: crop image area that doesn't contain person. 
             if (~is_pose2d).sum() > 0:
                 sample_ids = sample_ids[np.where(~is_pose2d[sample_ids])[0]]
                 vboxes = np.array([full_kp2ds[ind] for ind in sample_ids])[2:].reshape(-1,2)

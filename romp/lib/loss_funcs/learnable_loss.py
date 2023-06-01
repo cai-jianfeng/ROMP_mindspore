@@ -42,17 +42,13 @@ class Learnable_Loss(nn.Cell):
                     kp3d_gt = outputs['meta_data']['kp_3d'][kp3d_mask]
                     preds_kp3d = outputs['j3d'][kp3d_mask, :kp3d_gt.shape[1]]
                     if len(preds_kp3d) > 0:
-                        loss_dict['PAMPJPE'] = calc_pampjpe(kp3d_gt.float(),
-                                                            preds_kp3d.float()).mean() * args().PAMPJPE_weight
+                        loss_dict['PAMPJPE'] = calc_pampjpe(kp3d_gt.float(), preds_kp3d.float()).mean() * args().PAMPJPE_weight
                 except Exception as exp_error:
                     print('PA_MPJPE calculation failed! ll', exp_error)
-
         loss_dict = {key: value.mean() for key, value in loss_dict.items() if not isinstance(value, int)}
-
         if new_training and args().model_version == 6:
             loss_dict['CenterMap_3D'] = loss_dict['CenterMap_3D'] / 1000.
             loss_dict = {key: loss_dict[key] for key in self.loss_class['det']}
-
         loss_list = []
         for key, value in loss_dict.items():
             if isinstance(value, mindspore.Tensor):
@@ -62,11 +58,9 @@ class Learnable_Loss(nn.Cell):
                     else:
                         loss_list.append(value / (value.numpy().item() / args().loss_thresh))
         loss = sum(loss_list)
-
         loss_tasks = {}
         for loss_class in self.loss_class:
-            loss_tasks[loss_class] = sum(
-                [loss_dict[item] for item in self.loss_class[loss_class] if item in loss_dict])
+            loss_tasks[loss_class] = sum([loss_dict[item] for item in self.loss_class[loss_class] if item in loss_dict])
 
         left_loss = sum([loss_dict[loss_item] for loss_item in loss_dict if loss_item not in self.all_loss_names])
         if left_loss != 0:

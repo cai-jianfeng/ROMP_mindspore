@@ -20,9 +20,10 @@ from config import args
 # DEFAULT_DTYPE = mindspore.float32
 DEFAULT_DTYPE = mindspore.float32
 
+
 class Interperlation_penalty(nn.Cell):
-    def __init__(self, faces_tensor, df_cone_height = 0.5,  point2plane=False, penalize_outside=True, max_collisions=8,\
-        part_segm_fn=None): # os.path.join(config.project_dir,"model/smplx/smplx_parts_segm.pkl")
+    def __init__(self, faces_tensor, df_cone_height=0.5, point2plane=False, penalize_outside=True, max_collisions=8, \
+                 part_segm_fn=None):  # os.path.join(config.project_dir,"model/smplx/smplx_parts_segm.pkl")
         super(Interperlation_penalty, self).__init__()
 
         self.pen_distance = collisions_loss.DistanceFieldPenetrationLoss(
@@ -43,12 +44,13 @@ class Interperlation_penalty(nn.Cell):
             # Create the module used to filter invalid collision pairs
             self.tri_filtering_module = FilterFaces(
                 faces_segm=faces_segm, faces_parents=faces_parents).cuda()
-    def construct(self,vertices):
+
+    def construct(self, vertices):
         pen_loss = 0.0
         # Calculate the loss due to interpenetration
         batch_size = vertices.shape[0]
         triangles = ops.index_select(vertices, 1,
-            self.body_model_faces).view(batch_size, -1, 3, 3)
+                                     self.body_model_faces).view(batch_size, -1, 3, 3)
 
         with ops.stop_gradient():
             collision_idxs = self.search_tree(triangles)
@@ -63,12 +65,13 @@ class Interperlation_penalty(nn.Cell):
                 self.pen_distance(triangles, collision_idxs))
         return pen_loss
 
+
 def vposer_valid():
     vposer, pose_embedding = [None, ] * 2
 
     pose_embedding = ops.zeros([batch_size, 32],
-                                 dtype=dtype, device=device,
-                                 requires_grad=True)
+                               dtype=dtype, device=device,
+                               requires_grad=True)
 
     vposer_ckpt = osp.expandvars(vposer_ckpt)
     vposer, _ = load_vposer(vposer_ckpt, vp_model='snapshot')
@@ -76,7 +79,7 @@ def vposer_valid():
     vposer.eval()
 
     body_mean_pose = ops.zeros([batch_size, vposer_latent_dim],
-                                 dtype=dtype)
+                               dtype=dtype)
 
     with ops.stop_gradient():
         pose_embedding.fill_(0)
@@ -90,8 +93,9 @@ def vposer_valid():
         final_params.append(pose_embedding)
     result['body_pose'] = pose_embedding.detach().cpu().numpy()
     body_pose = vposer.decode(
-            pose_embedding,
-            output_type='aa').view(1, -1)
+        pose_embedding,
+        output_type='aa').view(1, -1)
+
 
 def create_prior(prior_type, **kwargs):
     if prior_type == 'gmm':
@@ -104,17 +108,22 @@ def create_prior(prior_type, **kwargs):
         # Don't use any pose prior
         def no_prior(*args, **kwargs):
             return 0.0
+
         prior = no_prior
     else:
         raise ValueError('Prior {}'.format(prior_type) + ' is not implemented')
     return prior
+
 
 def angle_prior(pose):
     """
     Angle prior that penalizes unnatural bending of the knees and elbows
     """
     # We subtract 3 because pose does not include the global rotation of the model
-    return (ops.exp(pose[:, [55-3, 58-3, 12-3, 15-3]] * mindspore.Tensor([1., -1., -1, -1.], device=pose.device)) ** 2).sum(axis=-1)
+    return (ops.exp(
+        pose[:, [55 - 3, 58 - 3, 12 - 3, 15 - 3]] * mindspore.Tensor([1., -1., -1, -1.], device=pose.device)) ** 2).sum(
+        axis=-1)
+
 
 def t_t2m(tensor_t):
     '''
@@ -138,10 +147,10 @@ class SMPLifyAnglePrior(nn.Cell):
         self.register_buffer('angle_prior_idxs', angle_prior_idxs)
 
         angle_prior_signs = mindspore.Tensor([1, -1, -1, -1],
-                                     dtype=mindspore.float32 if dtype == mindspore.float32
-                                     else np.float64)
+                                             dtype=mindspore.float32 if dtype == mindspore.float32
+                                             else np.float64)
         angle_prior_signs = mindspore.Tensor(angle_prior_signs,
-                                         dtype=dtype)
+                                             dtype=dtype)
         self.register_buffer('angle_prior_signs', angle_prior_signs)
 
     def construct(self, pose, with_global_pose=False):
@@ -159,7 +168,7 @@ class SMPLifyAnglePrior(nn.Cell):
         '''
         angle_prior_idxs = self.angle_prior_idxs - (not with_global_pose) * 3
         return ops.exp(pose[:, angle_prior_idxs] *
-                         self.angle_prior_signs).pow(2)
+                       self.angle_prior_signs).pow(2)
 
 
 class L2Prior(nn.Cell):
@@ -188,18 +197,19 @@ class MaxMixturePrior(nn.Cell):
         self.num_gaussians = num_gaussians
         self.epsilon = epsilon
         self.use_merged = use_merged
-        
-        #gmm_fn = 'gmm_{:02d}.pkl'.format(num_gaussians)
-        #smpl_prior_path = os.path.join(prior_folder, gmm_fn)
-        assert os.path.exists(smpl_prior_path),print('The path to the mixture prior {} does not exist'.format(smpl_prior_path))
+
+        # gmm_fn = 'gmm_{:02d}.pkl'.format(num_gaussians)
+        # smpl_prior_path = os.path.join(prior_folder, gmm_fn)
+        assert os.path.exists(smpl_prior_path), print(
+            'The path to the mixture prior {} does not exist'.format(smpl_prior_path))
 
         with open(smpl_prior_path, 'rb') as f:
             gmm = pickle.load(f, encoding='latin1')
 
         if type(gmm) == dict:
-            means = gmm['means']#.astype(np_dtype)
-            covs = gmm['covars']#.astype(np_dtype)
-            weights = gmm['weights']#.astype(np_dtype)
+            means = gmm['means']  # .astype(np_dtype)
+            covs = gmm['covars']  # .astype(np_dtype)
+            weights = gmm['weights']  # .astype(np_dtype)
         elif 'sklearn.mixture.gmm.GMM' in str(type(gmm)):
             means = gmm.means_.astype(np_dtype)
             covs = gmm.covars_.astype(np_dtype)
@@ -213,27 +223,30 @@ class MaxMixturePrior(nn.Cell):
         self.covs = mindspore.Parameter(mindspore.Tensor(covs, dtype=dtype), 'covs', requires_grad=False)
 
         precisions = [np.linalg.inv(cov) for cov in covs]
-        precisions = np.stack(precisions)#.astype(np_dtype)
+        precisions = np.stack(precisions)  # .astype(np_dtype)
 
-        self.precisions = mindspore.Parameter(mindspore.Tensor(precisions, dtype=dtype), 'precisions', requires_grad=False)
+        self.precisions = mindspore.Parameter(mindspore.Tensor(precisions, dtype=dtype), 'precisions',
+                                              requires_grad=False)
 
         # The constant term:
         sqrdets = mindspore.Tensor([(np.sqrt(np.linalg.det(c)))
-                            for c in gmm['covars']])
-        const = mindspore.Tensor((2 * np.pi)**(69 / 2.))
+                                    for c in gmm['covars']])
+        const = mindspore.Tensor((2 * np.pi) ** (69 / 2.))
 
         # print(type(gmm['weights']))
         nll_weights = mindspore.Tensor(gmm['weights']) / (const * (sqrdets / sqrdets.min()))
         # print(type(nll_weights))
-        nll_weights = mindspore.Tensor(nll_weights).unsqueeze(0) #mindspore.Tensor(nll_weights, dtype=dtype).unsqueeze(0)
+        nll_weights = mindspore.Tensor(nll_weights).unsqueeze(
+            0)  # mindspore.Tensor(nll_weights, dtype=dtype).unsqueeze(0)
         self.nll_weights = mindspore.Parameter(nll_weights, 'nll_weights', requires_grad=False)
 
         weights = mindspore.Tensor(gmm['weights'], dtype=dtype).unsqueeze(0)
         self.weights = mindspore.Parameter(weights, 'weights', requires_grad=False)
 
-        self.pi_term = mindspore.Parameter(ops.log(mindspore.Tensor(2 * np.pi, dtype=dtype)), 'pi_term', requires_grad=False)
+        self.pi_term = mindspore.Parameter(ops.log(mindspore.Tensor(2 * np.pi, dtype=dtype)), 'pi_term',
+                                           requires_grad=False)
 
-        cov_dets = [np.log(np.linalg.det(cov) + epsilon) for cov in covs]   #cov.astype(np_dtype)
+        cov_dets = [np.log(np.linalg.det(cov) + epsilon) for cov in covs]  # cov.astype(np_dtype)
         self.cov_dets = mindspore.Parameter(mindspore.Tensor(cov_dets, dtype=dtype), 'cov_dets', requires_grad=False)
 
         # The dimensionality of the random variable
@@ -246,10 +259,12 @@ class MaxMixturePrior(nn.Cell):
 
     def merged_log_likelihood(self, pose):
         param_num = pose.shape[1]
-        diff_from_mean = pose.unsqueeze(axis=1) - self.means[:,:param_num]
-
-        prec_diff_prod = ops.einsum('mij,bmj->bmi',
-                                      [self.precisions[:,:param_num,:param_num], diff_from_mean])
+        diff_from_mean = pose.unsqueeze(dim=1) - self.means[:, :param_num]
+        # prec_diff_prod = ops.einsum('mij,bmj->bmi', [self.precisions[:,:param_num,:param_num], diff_from_mean])
+        # prec_diff_prod = ops.rand(diff_from_mean.shape[:2] + (self.precisions[:, :param_num, :param_num].shape[1], ))
+        # bmj -> mbj; mij -> mji; mbj * mji = mbi -> bmi
+        prec_diff_prod = ops.matmul(diff_from_mean.transpose(1, 0, 2),
+                                    self.precisions[:, :param_num, :param_num].transpose(0, 2, 1)).transpose(1, 0, 2)
         diff_prec_quadratic = (prec_diff_prod * diff_from_mean).sum(axis=-1)
 
         curr_loglikelihood = 0.5 * diff_prec_quadratic - ops.log(self.nll_weights)
@@ -273,10 +288,10 @@ class MaxMixturePrior(nn.Cell):
             diff_from_mean = pose - mean
 
             curr_loglikelihood = ops.einsum('bj,ji->bi',
-                                              [diff_from_mean, prec])
+                                            [diff_from_mean, prec])
             curr_loglikelihood = ops.einsum('bi,bi->b',
-                                              [curr_loglikelihood,
-                                               diff_from_mean])
+                                            [curr_loglikelihood,
+                                             diff_from_mean])
             cov_term = ops.log(ops.det(cov) + self.epsilon)
             curr_loglikelihood += 0.5 * (cov_term +
                                          self.random_var_dim *
@@ -295,6 +310,7 @@ class MaxMixturePrior(nn.Cell):
             return self.merged_log_likelihood(pose)
         else:
             return self.log_likelihood(pose)
+
 
 class MultiLossFactory(nn.Cell):
     def __init__(self, num_joints):
@@ -389,6 +405,6 @@ class MultiLossFactory(nn.Cell):
 
 if __name__ == '__main__':
     GMM = MaxMixturePrior()
-    result = GMM(ops.rand(16,63), ops.rand(16,10))
+    result = GMM(ops.rand(16, 63), ops.rand(16, 10))
     print(result.sum(-1))
-    print(angle_prior(ops.rand(16,63)).sum(axis=-1))
+    print(angle_prior(ops.rand(16, 63)).sum(axis=-1))

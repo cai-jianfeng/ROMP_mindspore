@@ -1,5 +1,5 @@
 import sys, os
-import mindspore  # import torch
+import mindspore as ms  # import torch
 from mindspore import nn
 import config
 import numpy as np
@@ -24,6 +24,7 @@ class SMPLR(nn.Cell):
         if len(pose.shape) == 1:
             # pose, betas = pose.unsqueeze(0), betas.unsqueeze(0)
             pose, betas = pose[np.newaxis, :], betas[np.newaxis, :]
+        pose, betas = ms.Tensor.from_numpy(pose), ms.Tensor.from_numpy(betas)
         verts, joints54_17 = self.smpls[gender](poses=pose, betas=betas)
 
         return verts.numpy(), joints54_17[:, :54].numpy()

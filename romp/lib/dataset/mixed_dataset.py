@@ -98,6 +98,9 @@ class MixedDataset:
         else:
             index_sample = int(sample_prob * self.lengths[dataset_id])
         data = self.datasets[dataset_id][index_sample]
+        # print(data)  # flag3d
+        # print(index_sample)
+        # print(data)
         data['subject_ids'][data['subject_ids'] != -1] += self.ID_num_list[dataset_id]
         # print(type(data))
         # print(data.keys())

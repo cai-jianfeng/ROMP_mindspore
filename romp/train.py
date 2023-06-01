@@ -128,11 +128,14 @@ class Trainer(Base):
 
             data_time.update(time.time() - batch_start_time)
             run_start_time = time.time()
-
+            print(len(meta_data))
             # ============================================
             # TODO: 修改成 mindspore 的格式
             grad_fn = ms.value_and_grad(self.train_step, None, self.optimizer.parameters, has_aux=True)
             (loss, outputs), grads = grad_fn(meta_data)
+            for grad in grads:
+                print(grad.dtype)
+            grads = (grad.astype(ms.float32) for grad in grads)
             self.optimizer(grads)
 
             if self.local_rank in [-1, 0]:
@@ -150,7 +153,7 @@ class Trainer(Base):
 
         title = '{}_epoch_{}.ckpt'.format(self.tab, epoch)
         save_model(self.model, title, parent_folder=self.model_save_dir)
-        # TODO: torch的piecewise_constant_lr实验.step()方法更新学习率; 而mindspore直接作为optimizer的输出
+        # torch的piecewise_constant_lr实验.step()方法更新学习率; 而mindspore直接作为optimizer的输出
         # self.e_sche.step()
 
     def validation(self, epoch):
@@ -206,5 +209,5 @@ def main():
 
 
 if __name__ == '__main__':
-    ms.context.set_context(device_target="CPU")
+    # ms.context.set_context(device_target="CPU")
     main()

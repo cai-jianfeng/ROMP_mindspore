@@ -37,18 +37,18 @@ class SMPLWrapper(nn.Cell):
         idx_list, params_dict = [0], {}
         for i, (idx, name) in enumerate(zip(self.part_idx, self.part_name)):
             idx_list.append(idx_list[i] + idx)
-            params_dict[name] = outputs['params_pred'][:, idx_list[i]: idx_list[i + 1]].contiguous()
+            params_dict[name] = outputs['params_pred'][:, idx_list[i]: idx_list[i + 1]]
 
         if args().Rot_type == '6D':
             params_dict['body_pose'] = rot6D_to_angular(params_dict['body_pose'])
             params_dict['global_orient'] = rot6D_to_angular(params_dict['global_orient'])
         N = params_dict['body_pose'].shape[0]
-        params_dict['body_pose'] = ops.cat([params_dict['body_pose'], ops.zeros(N, 6)], 1)
+        params_dict['body_pose'] = ops.cat([params_dict['body_pose'], ops.zeros((N, 6))], 1)
         params_dict['poses'] = ops.cat([params_dict['global_orient'], params_dict['body_pose']], 1)
 
         vertices, joints54_17 = self.smpl_model(betas=params_dict['betas'], poses=params_dict['poses'],
                                                 root_align=args().smpl_mesh_root_align)
-
+        vertices, joints54_17 = mindspore.Tensor.from_numpy(vertices.numpy()), mindspore.Tensor.from_numpy(joints54_17.numpy())
         outputs.update({'params': params_dict, 'verts': vertices, 'j3d': joints54_17[:, :54],
                         'joints_h36m17': joints54_17[:, 54:]})
 
@@ -56,5 +56,6 @@ class SMPLWrapper(nn.Cell):
                                                 joints_h36m17_preds=outputs['joints_h36m17'],
                                                 vertices=outputs['verts'], input2orgimg_offsets=meta_data['offsets'],
                                                 presp=args().perspective_proj))
+        print('=============output succeed=================')
 
         return outputs

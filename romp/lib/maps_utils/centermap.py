@@ -137,7 +137,7 @@ class CenterMap(object):
 
             masked_heatmap = heatmap[0, y - top:y + bottom, x - left:x + right]
             masked_gaussian = gaussian[radius - top:radius + bottom, radius - left:radius + right]
-            if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:  # TODO debug
+            if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:
                 np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
             heatmap[0, y, x] = 1
         return heatmap

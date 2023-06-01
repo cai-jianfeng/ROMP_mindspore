@@ -134,7 +134,7 @@ class Base(object):
         if self.model_precision == 'fp16':
             # with autocast():
             #     outputs = model(meta_data, **cfg_dict)
-            # amp_level = "O3"
+            # amp_level = "O1"
             # model = auto_mixed_precision(model, amp_level)
             # print(cfg_dict)
             outputs = model(meta_data, **cfg_dict)
@@ -142,7 +142,7 @@ class Base(object):
             outputs = model(meta_data, **self.train_cfg)
         print('========output success===================')
         meta_data.update({'imgpath': imgpath_org, 'data_set': ds_org})
-        outputs['meta_data']['data_set'], outputs['meta_data']['imgpath'] = reorganize_items([ds_org, imgpath_org], outputs['reorganize_idx'].numpy())
+        # outputs['meta_data']['data_set'], outputs['meta_data']['imgpath'] = reorganize_items([ds_org, imgpath_org], outputs['reorganize_idx'])
         return outputs
 
     def _create_data_loader(self, train_flag=True):
@@ -150,7 +150,7 @@ class Base(object):
         print(self.dataset)
         print(self.sample_prob_dict)
         datasets = MixedDataset(self.dataset.split(','), self.sample_prob_dict, train_flag=train_flag)
-        print(datasets[0][0].shape)
+        # print(datasets[0][0].shape)
         batch_size = self.batch_size if train_flag else self.val_batch_size
         if self.distributed_training:  # 不会进入
             pass

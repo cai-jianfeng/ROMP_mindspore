@@ -1,6 +1,6 @@
 import mindspore # import torch
 from mindspore import ops, nn
-from torch.nn import functional as F
+# from torch.nn import functional as F
 import numpy as np
 
 def rot6D_to_angular(rot6D):
@@ -21,8 +21,8 @@ def rot6d_to_rotmat_batch(x):
     x = x.view(-1,3,2)
     a1 = x[:, :, 0]
     a2 = x[:, :, 1]
-    b1 = F.normalize(a1)
-    b2 = F.normalize(a2 - ops.einsum('bi,bi->b', b1, a2).unsqueeze(-1) * b1)
+    b1 = ops.L2Normalize()(a1)
+    b2 = ops.L2Normalize()(a2 - ops.einsum('bi,bi->b', b1, a2).unsqueeze(-1) * b1)
 
     # inp = a2 - ops.einsum('bi,bi->b', b1, a2).unsqueeze(-1) * b1
     # denom = inp.pow(2).sum(axis=1).sqrt().unsqueeze(-1) + 1e-8
@@ -35,14 +35,14 @@ def rot6d_to_rotmat(x):
     x = x.view(-1,3,2)
 
     # Normalize the first vector
-    b1 = F.normalize(x[:, :, 0], axis=1, eps=1e-6)
+    b1 = ops.L2Normalize(axis=1, epsilon=1e-6)(x[:, :, 0])
 
-    dot_prod = ops.sum(b1 * x[:, :, 1], axis=1, keepaxis=True)
+    dot_prod = ops.sum(b1 * x[:, :, 1], dim=1, keepdim=True)
     # Compute the second vector by finding the orthogonal complement to it
-    b2 = F.normalize(x[:, :, 1] - dot_prod * b1, axis=-1, eps=1e-6)
+    b2 = ops.L2Normalize(axis=-1, epsilon=1e-6)(x[:, :, 1] - dot_prod * b1)
 
     # Finish building the basis by taking the cross product
-    b3 = ops.cross(b1, b2, axis=1)
+    b3 = ops.cross(b1, b2, dim=1)
     rot_mats = ops.stack([b1, b2, b3], axis=-1)
 
     return rot_mats
@@ -399,13 +399,13 @@ def angle_axis_to_rotation_matrix(angle_axis: mindspore.Tensor) -> mindspore.Ten
     # create mask to handle both cases
     eps = 1e-6
     mask = (theta2 > eps).view(-1, 1, 1).to(theta2.device)
-    mask_pos = (mask).type_as(theta2)
-    mask_neg = (mask == False).type_as(theta2)  # noqa
+    mask_pos = (mask).astype(theta2)
+    mask_neg = (mask == False).astype(theta2)  # noqa
 
     # create output pose matrix
     batch_size = angle_axis.shape[0]
-    rotation_matrix = ops.eye(3).to(angle_axis.device).type_as(angle_axis)
-    rotation_matrix = rotation_matrix.view(1, 3, 3).repeat(batch_size, 1, 1)
+    rotation_matrix = ops.eye(3).to(angle_axis.device).astype(angle_axis)
+    rotation_matrix = rotation_matrix.view(1, 3, 3).tile(batch_size, 1, 1)
     # fill output matrix with masked values
     rotation_matrix[..., :3, :3] = \
         mask_pos * rotation_matrix_normal + mask_neg * rotation_matrix_taylor
@@ -527,34 +527,34 @@ def rotation_matrix_to_quaternion(rotation_matrix, eps=1e-6):
     q0 = ops.stack([rmat_t[:, 1, 2] - rmat_t[:, 2, 1],
                       t0, rmat_t[:, 0, 1] + rmat_t[:, 1, 0],
                       rmat_t[:, 2, 0] + rmat_t[:, 0, 2]], -1)
-    t0_rep = t0.repeat(4, 1).t()
+    t0_rep = t0.tile((4, 1)).t()
 
     t1 = 1 - rmat_t[:, 0, 0] + rmat_t[:, 1, 1] - rmat_t[:, 2, 2]
     q1 = ops.stack([rmat_t[:, 2, 0] - rmat_t[:, 0, 2],
                       rmat_t[:, 0, 1] + rmat_t[:, 1, 0],
                       t1, rmat_t[:, 1, 2] + rmat_t[:, 2, 1]], -1)
-    t1_rep = t1.repeat(4, 1).t()
+    t1_rep = t1.tile((4, 1)).t()
 
     t2 = 1 - rmat_t[:, 0, 0] - rmat_t[:, 1, 1] + rmat_t[:, 2, 2]
     q2 = ops.stack([rmat_t[:, 0, 1] - rmat_t[:, 1, 0],
                       rmat_t[:, 2, 0] + rmat_t[:, 0, 2],
                       rmat_t[:, 1, 2] + rmat_t[:, 2, 1], t2], -1)
-    t2_rep = t2.repeat(4, 1).t()
+    t2_rep = t2.tile((4, 1)).t()
 
     t3 = 1 + rmat_t[:, 0, 0] + rmat_t[:, 1, 1] + rmat_t[:, 2, 2]
     q3 = ops.stack([t3, rmat_t[:, 1, 2] - rmat_t[:, 2, 1],
                       rmat_t[:, 2, 0] - rmat_t[:, 0, 2],
                       rmat_t[:, 0, 1] - rmat_t[:, 1, 0]], -1)
-    t3_rep = t3.repeat(4, 1).t()
+    t3_rep = t3.tile((4, 1)).t()
 
-    mask_c0 = mask_d2 * mask_d0_d1
-    mask_c1 = mask_d2 * ~mask_d0_d1
-    mask_c2 = ~mask_d2 * mask_d0_nd1
-    mask_c3 = ~mask_d2 * ~mask_d0_nd1
-    mask_c0 = mask_c0.view(-1, 1).type_as(q0)
-    mask_c1 = mask_c1.view(-1, 1).type_as(q1)
-    mask_c2 = mask_c2.view(-1, 1).type_as(q2)
-    mask_c3 = mask_c3.view(-1, 1).type_as(q3)
+    mask_c0 = mask_d2.astype(mindspore.int32) * mask_d0_d1.astype(mindspore.int32)
+    mask_c1 = mask_d2.astype(mindspore.int32) * (~mask_d0_d1).astype(mindspore.int32)
+    mask_c2 = (~mask_d2).astype(mindspore.int32) * mask_d0_nd1.astype(mindspore.int32)
+    mask_c3 = (~mask_d2).astype(mindspore.int32) * (~mask_d0_nd1).astype(mindspore.int32)
+    mask_c0 = mask_c0.view(-1, 1).astype(q0.dtype)
+    mask_c1 = mask_c1.view(-1, 1).astype(q1.dtype)
+    mask_c2 = mask_c2.view(-1, 1).astype(q2.dtype)
+    mask_c3 = mask_c3.view(-1, 1).astype(q3.dtype)
 
     q = q0 * mask_c0 + q1 * mask_c1 + q2 * mask_c2 + q3 * mask_c3
     q = q / ops.sqrt(t0_rep * mask_c0 + t1_rep * mask_c1 +  # noqa
@@ -563,6 +563,6 @@ def rotation_matrix_to_quaternion(rotation_matrix, eps=1e-6):
 
 
 if __name__ == '__main__':
-    pose = rot6D_to_angular(ops.rand(16,6))
+    pose = rot6D_to_angular(ops.rand(16, 6))
     print(pose.shape)
     print(pose[0])

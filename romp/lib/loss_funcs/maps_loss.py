@@ -208,7 +208,6 @@ class Heatmap_AE_loss(nn.Cell):
         self.pull_loss_factor = 1. #0.001 #0.1
 
     def construct(self, outputs, heatmaps, joints):
-        # TODO(bowen): outputs and heatmaps can be lists of same length
         heatmaps_pred = outputs[:, :self.num_joints]
         tags_pred = outputs[:, self.num_joints:]
 
