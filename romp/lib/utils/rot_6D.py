@@ -21,6 +21,7 @@ def rot6d_to_rotmat_batch(x):
     x = x.view(-1,3,2)
     a1 = x[:, :, 0]
     a2 = x[:, :, 1]
+    # TODO: einsum
     b1 = ops.L2Normalize()(a1)
     b2 = ops.L2Normalize()(a2 - ops.einsum('bi,bi->b', b1, a2).unsqueeze(-1) * b1)
 

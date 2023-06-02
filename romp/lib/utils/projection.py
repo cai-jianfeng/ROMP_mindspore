@@ -149,6 +149,7 @@ def perspective_projection(points, translation=None, rotation=None, keep_dim=Fal
         K[:, -1, :-1] = camera_center
 
     # Transform points
+    # TODO: einsum
     if rotation is not None:
         points = ops.einsum('bij,bkj->bki', rotation, points)
     if translation is not None:

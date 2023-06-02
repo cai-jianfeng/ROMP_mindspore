@@ -26,6 +26,7 @@ class VertexJointSelector(nn.Cell):
         extra_joints21 = ops.index_select(vertices, 1, self.extra_joints_idxs)
         b, i, k = vertices.shape
         j, _ = self.J_regressor_extra9.shape
+        # TODO: einsum
         # extra_joints9 = ops.einsum('bik,ji->bjk', [vertices, self.J_regressor_extra9])
         vertices_1 = vertices.transpose((0, 2, 1)).view(-1, vertices.shape[1])
         J_regressor_extra9_1 = self.J_regressor_extra9.transpose((1, 0))

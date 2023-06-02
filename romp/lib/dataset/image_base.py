@@ -171,22 +171,21 @@ class Image_base:
             input_data.update({'cams': cam_params, 'cam_mask': cam_mask, 'root_trans_cam': root_trans,
                                'centermap_3d': centermap_3d.float(),
                                'valid_centermap3d_mask': mindspore.Tensor([valid_centermap3d_mask]).bool()})
-
         if args().learn_relative:
             input_data.update({'depth_info': ops.ones(self.max_person, 4).long() * -1,
                                'kid_shape_offsets': ops.zeros(self.max_person).float()})
         # print_data_shape(input_data)
-
         if 'seq_info' in info:
             input_data.update({'seq_info': mindspore.Tensor(info['seq_info'])})
-        np_input_data = {}
-        for key, data in input_data.items():
-            if isinstance(data, mindspore.Temsor):
-                if data.dtype == mindspore.float64:
-                    input_data[key] = data.astype(mindspore.float32)
-        for key, data in input_data.items():
-            if isinstance(data, mindspore.Tensor):
-                np_input_data[key] = data.numpy()
+        # np_input_data = {}
+        # for key, data in input_data.items():
+        #     if isinstance(data, mindspore.Tensor):
+        #         # print(type(data), '; ', data.dtype)
+        #         if data.dtype == mindspore.float64:
+        #             input_data[key] = data.astype(mindspore.float32)
+        # for key, data in input_data.items():
+        #     if isinstance(data, mindspore.Tensor):
+        #         np_input_data[key] = data.numpy()
             # elif isinstance(data, str):
             #     np_input_data[key] = np.array(data)
         return input_data

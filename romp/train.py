@@ -133,8 +133,8 @@ class Trainer(Base):
             # TODO: 修改成 mindspore 的格式
             grad_fn = ms.value_and_grad(self.train_step, None, self.optimizer.parameters, has_aux=True)
             (loss, outputs), grads = grad_fn(meta_data)
-            for grad in grads:
-                print(grad.dtype)
+            # for grad in grads:
+            #     print(grad.dtype)
             grads = (grad.astype(ms.float32) for grad in grads)
             self.optimizer(grads)
 

@@ -140,6 +140,7 @@ if __name__ == '__main__':
     from models.build import build_model
 
     model = build_model()
+    print(model)
     outputs = model.feed_forward({'image': ops.rand(4, 512, 512, 3)})
     for key, value in outputs.items():
         if isinstance(value, tuple):
