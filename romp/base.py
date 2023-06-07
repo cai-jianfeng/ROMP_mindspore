@@ -167,7 +167,7 @@ class Base(object):
             # datasets = datasets.shuffle(buffer_size=len(datasets))
             # datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(1)], shuffle=True, num_parallel_workers=self.nw)
             datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(19)], shuffle=True)
-            datasets = datasets.batch(batch_size=batch_size, drop_remainder=True if train_flag else False)
+            datasets = datasets.batch(batch_size=batch_size, drop_remainder=True if train_flag else False)  # , num_parallel_workers=self.nw
             return datasets
 
     def _create_single_data_loader(self, shuffle=False, drop_last=False, **kwargs):
