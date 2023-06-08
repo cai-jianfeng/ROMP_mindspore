@@ -1,13 +1,14 @@
 import sys, os
 sys.path.append(os.path.join(os.getcwd(), 'lib/'))
 print(sys.path)
-# from .base import *
-from base import *
-# from .eval import val_result
-from eval import val_result
+from .base import *
+# from base import *
+from .eval import val_result
+# from eval import val_result
 from loss_funcs import Loss, Learnable_Loss
 from collections import Iterable
 import mindspore as ms
+from mindspore import ops
 # hello world!
 np.set_printoptions(precision=2, suppress=True)
 
@@ -55,10 +56,33 @@ class Trainer(Base):
         # self.summary_writer.close()
         
     # TODO: 修改 train_step 成 mindspore 的格式 => 相当于 mindspore 文档的快速入门中的 forward_fn, 执行前向过程并放回 loss
-    def train_step(self, meta_data):
+    def train_step(self,
+                   meta_data
+                   ):
         # 这里需要重新组装meta_data
-        dict_data = {self.keys[i]: value for i, value in enumerate(meta_data)}
-        meta_data = dict_data
+        meta_data = {self.keys[i]: value for i, value in enumerate(meta_data)}
+        # meta_data = {
+        #     self.keys[0]: data1,
+        #     self.keys[1]: data2,
+        #     self.keys[2]: data3,
+        #     self.keys[3]: data4,
+        #     self.keys[4]: data5,
+        #     self.keys[5]: data6,
+        #     self.keys[6]: data7,
+        #     self.keys[7]: data8,
+        #     self.keys[8]: data9,
+        #     self.keys[9]: data10,
+        #     self.keys[10]: data11,
+        #     self.keys[11]: data12,
+        #     self.keys[12]: data13,
+        #     self.keys[13]: data14,
+        #     self.keys[14]: data15,
+        #     self.keys[15]: data16,
+        #     self.keys[16]: data17,
+        #     self.keys[17]: data18,
+        #     self.keys[18]: data19,
+        # }
+        # meta_data = dict_data
         # self.optimizer.zero_grad()
         outputs = self.network_forward(self.model, meta_data, self.train_cfg)
 
@@ -128,11 +152,34 @@ class Trainer(Base):
 
             data_time.update(time.time() - batch_start_time)
             run_start_time = time.time()
-            print(len(meta_data))
+            print(len(meta_data), '; ', type(meta_data), '; ', type(meta_data[0]))
             # ============================================
             # TODO: 修改成 mindspore 的格式
             grad_fn = ms.value_and_grad(self.train_step, None, self.optimizer.parameters, has_aux=True)
-            (loss, outputs), grads = grad_fn(meta_data)
+
+            # (loss, outputs), grads = grad_fn(*meta_data)
+            # data1 = meta_data[0]
+            # data2 = meta_data[1]
+            # data3 = meta_data[2]
+            # data4 = meta_data[3]
+            # data5 = meta_data[4]
+            # data6 = meta_data[5]
+            # data7 = meta_data[6]
+            # data8 = meta_data[7]
+            # data9 = meta_data[8]
+            # data10 = meta_data[9]
+            # data11 = meta_data[10]
+            # data12 = meta_data[11]
+            # data13 = meta_data[12]
+            # data14 = meta_data[13]
+            # data15 = meta_data[14]
+            # data16 = meta_data[15]
+            # data17 = meta_data[16]
+            # data18 = meta_data[17]
+            # data19 = meta_data[18]
+            (loss, outputs), grads = grad_fn(
+                meta_data
+            )
             # for grad in grads:
             #     print(grad.dtype)
             grads = (grad.astype(ms.float32) for grad in grads)

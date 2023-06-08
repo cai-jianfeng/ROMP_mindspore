@@ -43,7 +43,7 @@ class Loss(nn.Cell):
         meta_data = outputs['meta_data']
 
         detect_loss_dict = self._calc_detection_loss(outputs, meta_data)
-        detection_flag = outputs['detection_flag'].sum()#  if args().model_return_loss else outputs['detection_flag']
+        detection_flag = outputs['detection_flag'].sum()  # if args().model_return_loss else outputs['detection_flag']
 
         loss_dict = detect_loss_dict
         kp_error = None

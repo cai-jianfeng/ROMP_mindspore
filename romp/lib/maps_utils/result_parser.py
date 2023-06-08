@@ -41,7 +41,7 @@ class ResultParser(nn.Cell):
         if 'params_pred' in outputs and self.with_smpl_parser and args().calc_smpl_mesh:
             outputs = self.params_map_parser(outputs, meta_data)
 
-        if 'detection_flag' not in outputs:
+        if 'detection_flag' not in outputs:  # 不会进入
             outputs['detection_flag'] = self.determine_detection_flag(outputs, meta_data)
         return outputs, meta_data
 
