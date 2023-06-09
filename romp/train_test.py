@@ -115,7 +115,7 @@ class Trainer(Base):
             # data19 = meta_data[18]
             # ============================================
             # TODO: 修改成 mindspore 的格式
-            # data = meta_data[0]
+            # data = meta_data[0]  # 4, 3, 512, 512
             data = ops.rand((4, 3, 512, 512)).astype(ms.float32)
             label = ops.randint(0, 10, (4, )).astype(ms.int32)
             # data = data.transpose((0, 3, 1, 2))  # shape = (4, 3, 512, 512)

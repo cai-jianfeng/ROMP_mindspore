@@ -49,10 +49,11 @@ class SMPL(nn.Cell):
     def __init__(self, model_path, model_type='smpl', dtype=ms.float32):
         super(SMPL, self).__init__()
         self.dtype = dtype
+        # TODO: 这里的 model_path 所保存的参数是 .pkl 类型, 即需要 torch.load 读入后再将其转化为 ms.Tensor
         model_info = torch.load(model_path)
         # print(type(model_info))
         for key, item in model_info.items():
-            # print(key, '; ', item.shape)
+            # print(key, '; ', item.dtype)  # item 的类型全为 torch.Tensor
             model_info[key] = ms.Tensor.from_numpy(item.numpy())
         self.vertex_joint_selector = VertexJointSelector(model_info['extra_joints_index'],
                                                          model_info['J_regressor_extra9'],

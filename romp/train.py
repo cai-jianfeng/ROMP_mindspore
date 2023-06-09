@@ -1,10 +1,10 @@
 import sys, os
 sys.path.append(os.path.join(os.getcwd(), 'lib/'))
 print(sys.path)
-from .base import *
-# from base import *
-from .eval import val_result
-# from eval import val_result
+# from .base import *
+from base import *
+# from .eval import val_result
+from eval import val_result
 from loss_funcs import Loss, Learnable_Loss
 from collections import Iterable
 import mindspore as ms
@@ -182,7 +182,7 @@ class Trainer(Base):
             )
             # for grad in grads:
             #     print(grad.dtype)
-            grads = (grad.astype(ms.float32) for grad in grads)
+            grads = tuple(grad.astype(ms.float32) for grad in grads)
             self.optimizer(grads)
 
             if self.local_rank in [-1, 0]:
@@ -256,5 +256,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # ms.context.set_context(device_target="CPU")
+    ms.context.set_context(device_target="CPU")
     main()

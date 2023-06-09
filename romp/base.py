@@ -8,8 +8,7 @@ import pickle
 import mindspore
 from mindspore import ops, nn
 import mindspore.numpy as ms_np
-# from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import Dataset, DataLoader, ConcatDataset
+from mindspore.dataset import GeneratorDataset
 
 import config
 import constants
@@ -166,8 +165,8 @@ class Base(object):
             #                   drop_last=True if train_flag else False, pin_memory=True, num_workers=self.nw)
             # datasets = datasets.shuffle(buffer_size=len(datasets))
             # datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(1)], shuffle=True, num_parallel_workers=self.nw)
-            datasets = mindspore.dataset.GeneratorDataset(datasets, column_names=[f'{i}' for i in range(19)], shuffle=True)
-            datasets = datasets.batch(batch_size=batch_size, drop_remainder=True if train_flag else False)  # , num_parallel_workers=self.nw
+            datasets = GeneratorDataset(datasets, column_names=[key for key in self.keys], shuffle=True)
+            datasets = datasets.batch(batch_size=batch_size, drop_remainder=True if train_flag else False, num_parallel_workers=self.nw)
             return datasets
 
     def _create_single_data_loader(self, shuffle=False, drop_last=False, **kwargs):

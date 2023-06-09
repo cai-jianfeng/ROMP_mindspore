@@ -138,6 +138,7 @@ def FLAG3D(base_class=default_mode):
                 poses, betas = np.concatenate([params[:, :-10], np.zeros((len(params), 6))], 1), params[:, -10:]
                 for pose, beta, gender in zip(poses, betas, genders):
                     gender = 'n' if gender is None else gender
+                    # TODO: 这里将 pose 与 beta 修改成 ms.Tensor 的形式是因为 ms.Cell 类型的网络不支持除 ms.Tensor/Parameter 和基本类型(int等) 以外的输入
                     pose, beta = ms.Tensor.from_numpy(pose), ms.Tensor.from_numpy(beta)
                     verts.append(self.smplr(pose, beta, gender)[0])
                     # smpl_outs = self.smplr(pose, beta, gender)
